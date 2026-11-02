@@ -1,0 +1,11 @@
+{
+  "name": "archipelago",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "socket.io": "^4.8.1"
+  }
+}

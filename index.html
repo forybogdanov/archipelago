@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Archipelago</title>
+<style>
+  :root { --bg:#0f1b2b; --panel:#16263b; --ink:#e8eef6; --mut:#8aa0b8; --acc:#f0b429; --line:#2a4365; }
+  * { box-sizing:border-box }
+  body { margin:0; font:14px system-ui,sans-serif; background:var(--bg); color:var(--ink); height:100vh; overflow:hidden }
+  button { background:#2a4365; color:var(--ink); border:1px solid #3d5a80; border-radius:6px; padding:6px 10px; cursor:pointer; font:inherit }
+  button:disabled { opacity:.4; cursor:default }
+  button.on { background:var(--acc); color:#111 }
+  input, select { background:#0c1624; color:var(--ink); border:1px solid #3d5a80; border-radius:6px; padding:5px; font:inherit }
+  .hidden { display:none !important }
+  .muted { color:var(--mut) }
+  .row { display:flex; gap:6px; flex-wrap:wrap; align-items:center }
+  .card { background:var(--panel); padding:24px; border-radius:12px; width:min(380px,92vw); display:grid; gap:10px }
+  h1, h2 { margin:0 }
+  #lobby { display:flex; align-items:center; justify-content:center; height:100% }
+  #game { display:flex; height:100% }
+  #board { flex:1; min-width:0; position:relative }
+  canvas { width:100%; height:100%; display:block; cursor:pointer; touch-action:none }
+  #zoom { position:absolute; right:10px; bottom:10px; display:grid; gap:4px }
+  #zoom button { width:36px; height:36px; padding:0; font-size:18px; background:#000a }
+  #banner { position:absolute; top:10px; left:50%; transform:translateX(-50%); background:#000b; padding:8px 14px; border-radius:8px; pointer-events:none }
+  #side { width:350px; overflow-y:auto; background:var(--panel); padding:10px; display:grid; gap:10px; align-content:start }
+  section { border-top:1px solid var(--line); padding-top:8px }
+  h3 { margin:0 0 6px; font-size:12px; text-transform:uppercase; color:var(--mut); letter-spacing:.05em }
+  .res { display:grid; grid-template-columns:repeat(5,1fr); gap:4px; text-align:center }
+  .res > div { background:#0c1624; border-radius:6px; padding:4px; display:grid; gap:2px; justify-items:center }
+  .qty { width:46px }
+  .pl { display:flex; justify-content:space-between; gap:6px; padding:4px 6px; border-radius:6px }
+  .pl.cur { background:#223a5a }
+  .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; border:1px solid #000 }
+  #log { height:150px; overflow-y:auto; font-size:12px; color:var(--mut); margin-bottom:6px }
+  #modal { position:fixed; inset:0; background:#000a; display:flex; align-items:center; justify-content:center; z-index:5 }
+  #toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:#b23b3b; padding:8px 14px; border-radius:8px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:6 }
+  #toast.show { opacity:1 }
+  @media (max-width:800px) { #game { flex-direction:column } #board { height:50vh; flex:none } #side { width:100%; flex:1 } }
+</style>
+</head>
+<body>
+<div id="lobby"><div class="card">
+  <h1>⛵ Archipelago</h1>
+  <div id="entry" class="row"><input id="name" placeholder="Your name" maxlength="16" style="flex:1"><button id="joinBtn">Join</button></div>
+  <div id="wait" class="hidden">
+    <div id="waitPlayers"></div>
+    <div class="row" style="margin-top:10px"><button id="startBtn">Start game</button><span id="waitMsg" class="muted"></span></div>
+  </div>
+  <div class="muted">2–4 players · first to 12 Renown wins</div>
+</div></div>
+
+<div id="game" class="hidden">
+  <div id="board"><canvas id="cv"></canvas><div id="banner" class="hidden"></div>
+    <div id="zoom"><button id="zIn" title="Zoom in" aria-label="Zoom in">+</button><button id="zOut" title="Zoom out" aria-label="Zoom out">−</button><button id="zReset" title="Fit board" aria-label="Fit board">⤢</button><button id="zMute" title="Sound on/off" aria-label="Sound on/off">🔊</button></div>
+  </div>
+  <div id="side">
+    <section><h3>Captains</h3><div id="players"></div></section>
+    <section><h3>Turn</h3><div id="status" style="margin-bottom:6px"></div>
+      <div class="row">
+        <button data-a="roll">🎲 Roll</button>
+        <button data-mode="route">Route</button><button data-mode="outpost">Outpost</button><button data-mode="town">Town</button>
+        <button data-a="buy">Buy card</button><button data-a="end">End turn</button>
+      </div>
+      <div id="costs" class="muted" style="font-size:12px;margin-top:6px"></div>
+    </section>
+    <section><h3>Your goods <span class="muted">(trade ratio below)</span></h3><div class="res" id="hand"></div></section>
+    <section><h3>Expedition cards</h3><div id="cards"></div></section>
+    <section><h3>Bank / port</h3>
+      <div class="row">Give <select id="bGive"></select> get <select id="bGet"></select><button id="bankBtn">Trade</button></div>
+    </section>
+    <section><h3>Player trade</h3>
+      <div id="offerBox"></div>
+      <div id="offerForm">
+        <div class="muted">You give</div><div class="res" id="tGive"></div>
+        <div class="muted" style="margin-top:4px">You want</div><div class="res" id="tWant"></div>
+        <button id="offerBtn" style="margin-top:6px">Offer to everyone</button>
+      </div>
+    </section>
+    <section><h3>Log</h3><div id="log"></div>
+      <div class="row"><input id="chatIn" style="flex:1" maxlength="200" placeholder="Chat…"><button id="chatBtn">Send</button></div>
+    </section>
+  </div>
+</div>
+
+<div id="modal" class="hidden"><div class="card" id="modalBody"></div></div>
+<div id="toast"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const RES = ['timber', 'clay', 'wool', 'grain', 'metal'];
+const ICON = { timber: '🌲', clay: '🧱', wool: '🐑', grain: '🌾', metal: '⛏️' };
+const TCOL = { forest: '#2e7d32', quarry: '#b8643a', meadow: '#9ccc65', farm: '#e9c046', mine: '#607d8b', desert: '#e3c27a' };
+const STEP = { outpost: 'place an outpost', route: 'place a shipping route', roll: 'roll the dice', discard: 'pirates! players are discarding',
+  pirate: 'move the Pirate Fleet (click a hex)', steal: 'choose whom to rob', act: 'trade, build, end turn' };
+const CARD = { captain: '⚓ Captain — move the pirates & steal', boon: '🎁 Resource Boon — take any 2 goods', renown: '⭐ Renown — +1 point (secret)' };
+
+const $ = id => document.getElementById(id);
+const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
+const btn = (textContent, onclick, disabled = false) => el('button', { textContent, onclick, disabled });
+const dot = c => el('span', { className: 'dot', style: `background:${c}` });
+const fmt = b => RES.filter(k => b[k]).map(k => b[k] + ICON[k]).join(' ') || 'nothing';
+const ss = { get(k) { try { return sessionStorage.getItem(k); } catch { return null; } }, set(k, v) { try { sessionStorage.setItem(k, v); } catch {} } };
+// Per-tab id (sessionStorage) so a refresh rejoins as the same player, and two tabs = two players.
+const pid = ss.get('pid') || (() => { const id = Math.random().toString(36).slice(2) + Date.now().toString(36); ss.set('pid', id); return id; })();
+
+const socket = io({ transports: ['websocket'] }); // no URL: binds to whatever host/protocol served the page (localhost, LAN, ngrok)
+let S = null, mode = null, boon = false, modalKey = '';
+const act = (type, a = {}) => socket.emit('act', { type, ...a });
+const mine = () => S && S.turn === S.me;
+
+function toast(m) { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 3000); }
+
+socket.on('connect', () => { if (ss.get('joined')) socket.emit('join', { pid }); });
+socket.on('err', m => {
+  if (m.startsWith('Session expired')) { ss.set('joined', ''); return location.reload(); } // server restarted: back to the name screen
+  toast(m);
+});
+socket.on('state', s => { sounds(S, s); S = s; ss.set('joined', '1'); render(); });
+
+// ---------- sound ----------
+// Files live in /sfx/<name>.mp3; a missing file is simply silent.
+const SFX = {};
+let muted = ss.get('mute') === '1';
+function sfx(name) {
+  if (muted) return;
+  const a = SFX[name] ??= new Audio(`/sfx/${name}.mp3`);
+  a.currentTime = 0;
+  a.play().catch(() => {}); // missing file or autoplay blocked: stay quiet
+}
+const handSize = s => s?.my ? RES.reduce((n, k) => n + s.my.res[k], 0) : 0;
+// Compare old and new state; only entries logged since the last update count.
+function sounds(old, s) {
+  if (!old || old.phase === 'lobby' || s.phase === 'lobby') return;
+  const fresh = s.log.slice(-Math.min(s.logSeq - (old.logSeq || 0), s.log.length));
+  if (fresh.some(m => !m.startsWith('💬') && / rolled \d+$/.test(m))) {
+    sfx('dice');
+    if (handSize(s) > handSize(old)) setTimeout(() => sfx('gain'), 900); // after the dice settle
+  }
+}
+function setMute(m) { muted = m; ss.set('mute', m ? '1' : '0'); $('zMute').textContent = m ? '🔇' : '🔊'; }
+
+$('name').value = ss.get('name') || '';
+$('joinBtn').onclick = () => { ss.set('name', $('name').value); socket.emit('join', { name: $('name').value, pid }); };
+$('name').onkeydown = e => { if (e.key === 'Enter') $('joinBtn').click(); }; // braces: returning false would cancel every keypress
+$('startBtn').onclick = () => socket.emit('start');
+
+// ---------- static controls ----------
+for (const id of ['bGive', 'bGet']) $(id).append(...RES.map(k => el('option', { value: k, textContent: ICON[k] + ' ' + k })));
+$('bGet').value = 'clay';
+$('bGive').onchange = $('bGet').onchange = () => renderSide();
+$('bankBtn').onclick = () => act('bank', { give: $('bGive').value, get: $('bGet').value });
+const qty = {};
+for (const side of ['tGive', 'tWant']) {
+  qty[side] = RES.map(() => el('input', { type: 'number', min: 0, max: 19, value: 0, className: 'qty' }));
+  $(side).append(...RES.map((k, i) => el('div', {}, ICON[k], qty[side][i])));
+}
+const readQty = side => Object.fromEntries(RES.map((k, i) => [k, +qty[side][i].value || 0]));
+$('offerBtn').onclick = () => act('offer', { give: readQty('tGive'), want: readQty('tWant') });
+$('chatBtn').onclick = () => { act('chat', { text: $('chatIn').value }); $('chatIn').value = ''; };
+$('chatIn').onkeydown = e => { if (e.key === 'Enter') $('chatBtn').click(); };
+document.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { mode = mode === b.dataset.mode ? null : b.dataset.mode; renderSide(); draw(); });
+
+// ---------- render ----------
+function render() {
+  const inGame = S.phase !== 'lobby';
+  $('lobby').classList.toggle('hidden', inGame);
+  $('game').classList.toggle('hidden', !inGame);
+  $('entry').classList.add('hidden');
+  $('wait').classList.remove('hidden');
+  if (!inGame) {
+    $('waitPlayers').replaceChildren(...S.players.map((p, i) => el('div', {}, dot(p.color), p.name + (i === S.me ? ' (you)' : ''))));
+    $('startBtn').classList.toggle('hidden', !S.isHost);
+    $('startBtn').disabled = S.players.length < 2;
+    $('waitMsg').textContent = S.isHost ? (S.players.length < 2 ? 'Waiting for players…' : '') : 'Waiting for the host to start…';
+    return;
+  }
+  renderSide();
+  fit();
+  renderModal();
+}
+
+function renderSide() {
+  if (!S?.board) return;
+  const my = S.my, live = S.phase === 'main' && mine(), acting = live && S.step === 'act';
+  const can = kind => RES.every(k => my.res[k] >= (S.cost[kind][k] || 0));
+
+  $('players').replaceChildren(...S.players.map((p, i) => el('div', { className: 'pl' + (i === S.turn ? ' cur' : '') },
+    el('span', {}, dot(p.color), p.name + (i === S.me ? ' (you)' : '') + (p.connected ? '' : ' ⚠️')),
+    el('span', { title: 'Renown · goods in hand · expedition cards · route length · captains played' },
+      `${p.points}★  🎴${p.hand} 📜${p.cards} 🛤${p.route}${S.longest === i ? '🏅' : ''} ⚓${p.captains}${S.fleet === i ? '🏅' : ''}`))));
+
+  const cur = S.players[S.turn], d = S.dice;
+  $('status').textContent = S.phase === 'over' ? `🏆 ${S.players[S.winner].name} wins!`
+    : `${mine() ? 'Your' : cur.name + "'s"} turn — ${STEP[S.step]}` + (d ? `   (🎲 ${d[0]}+${d[1]}=${d[0] + d[1]})` : '');
+  $('banner').textContent = mine() && S.phase !== 'over' ? 'Your turn — ' + STEP[S.step] : '';
+  $('banner').classList.toggle('hidden', !$('banner').textContent);
+
+  const enabled = { roll: live && S.step === 'roll', buy: acting && can('card') && S.deckLeft > 0, end: acting };
+  document.querySelectorAll('[data-a]').forEach(b => { b.disabled = !enabled[b.dataset.a]; });
+  document.querySelectorAll('[data-mode]').forEach(b => {
+    const k = b.dataset.mode;
+    b.disabled = !(acting && can(k) && my.left[k] > 0 && S.legal?.[k + 's']?.length);
+    if (b.disabled && mode === k) mode = null;
+    b.classList.toggle('on', mode === k);
+    b.title = `${my.left[k]} left`;
+  });
+  $('costs').textContent = Object.entries(S.cost).map(([k, c]) => `${k} ${fmt(c)}`).join(' · ') + ` · ${S.deckLeft} cards in deck`;
+
+  $('hand').replaceChildren(...RES.map(k => el('div', { title: k }, el('b', {}, `${ICON[k]} ${my.res[k]}`), el('small', { className: 'muted' }, my.ratios[k] + ':1'))));
+
+  const playable = live && (S.step === 'roll' || S.step === 'act') && !my.cardPlayed;
+  const rows = my.cards.map(c => el('div', { className: 'row' }, CARD[c],
+    c === 'renown' ? '' : btn('Play', () => { if (c === 'boon') { boon = true; renderModal(); } else act('play', { card: c }); }, !playable)));
+  rows.push(...my.fresh.map(c => el('div', { className: 'muted' }, CARD[c] + (c === 'renown' ? '' : ' (playable next turn)'))));
+  $('cards').replaceChildren(...(rows.length ? rows : [el('div', { className: 'muted' }, 'None yet.')]));
+
+  const g = $('bGive').value, n = my.ratios[g];
+  $('bankBtn').textContent = `Trade ${n}:1`;
+  $('bankBtn').disabled = !(acting && g !== $('bGet').value && my.res[g] >= n);
+
+  const T = S.trade, box = $('offerBox');
+  box.replaceChildren();
+  if (T) {
+    box.append(el('div', {}, `${S.players[T.from].name} offers ${fmt(T.give)} for ${fmt(T.want)}`));
+    if (T.from === S.me) {
+      box.append(el('div', { className: 'row' }, ...T.accepts.map(j => btn('Trade with ' + S.players[j].name, () => act('confirm', { with: j }))), btn('Cancel', () => act('cancel'))));
+      if (!T.accepts.length) box.append(el('div', { className: 'muted' }, 'Waiting for takers…'));
+    } else {
+      box.append(T.accepts.includes(S.me) ? el('div', { className: 'muted' }, 'You accepted — waiting for them.')
+        : btn('Accept', () => act('accept'), !RES.every(k => my.res[k] >= T.want[k])));
+    }
+  }
+  $('offerForm').classList.toggle('hidden', !acting);
+
+  const L = $('log');
+  L.replaceChildren(...S.log.map(m => el('div', {}, m)));
+  L.scrollTop = L.scrollHeight;
+}
+
+function renderModal() {
+  const key = S.phase === 'over' ? 'over' : S.discard ? 'discard' + S.discard : S.victims?.length ? 'steal' + S.victims : boon ? 'boon' : '';
+  if (key === modalKey) return;
+  modalKey = key;
+  const m = $('modalBody');
+  m.replaceChildren();
+  $('modal').classList.toggle('hidden', !key);
+  if (key === 'over') {
+    const ranked = S.players.map((p, i) => ({ ...p, i })).sort((a, b) => b.points - a.points);
+    m.append(el('h2', {}, `🏆 ${S.players[S.winner].name} wins!`),
+      ...ranked.map(p => el('div', {}, dot(p.color), `${p.name} — ${p.points} Renown`)),
+      el('div', { className: 'row' }, btn('View board', () => $('modal').classList.add('hidden')), S.isHost ? btn('New game', () => socket.emit('start')) : ''));
+  } else if (key.startsWith('discard')) {
+    const ins = RES.map(k => el('input', { type: 'number', min: 0, max: S.my.res[k], value: 0, className: 'qty' }));
+    m.append(el('h2', {}, `🏴‍☠️ Discard ${S.discard} goods`),
+      el('div', { className: 'res' }, ...RES.map((k, i) => el('div', {}, `${ICON[k]} ${S.my.res[k]}`, ins[i]))),
+      btn('Discard', () => act('discard', { res: Object.fromEntries(RES.map((k, i) => [k, +ins[i].value || 0])) })));
+  } else if (key.startsWith('steal')) {
+    m.append(el('h2', {}, 'Rob whom?'), el('div', { className: 'row' }, ...S.victims.map(j => btn(S.players[j].name, () => act('steal', { target: j })))));
+  } else if (key === 'boon') {
+    const sels = [0, 1].map(() => el('select', {}, ...RES.map(k => el('option', { value: k, textContent: ICON[k] + ' ' + k }))));
+    const close = () => { boon = false; renderModal(); };
+    m.append(el('h2', {}, '🎁 Resource Boon'), el('div', { className: 'row' }, ...sels),
+      el('div', { className: 'row' }, btn('Take', () => { act('play', { card: 'boon', res: sels.map(s => s.value) }); close(); }), btn('Cancel', close)));
+  }
+}
+
+// ---------- board canvas ----------
+// Two layers: the island (everything static) is drawn into `layer` only when something changes;
+// each animation frame paints the moving sea on the visible canvas and the cached island over it.
+const cv = $('cv'), seaCtx = cv.getContext('2d');
+const layer = document.createElement('canvas'), layerCtx = layer.getContext('2d');
+const ctx = layerCtx;
+
+// Painted tile art from /img; the patterns below stay as the fallback while it loads.
+// <terrain>.png = overhang art (see cut_tile.py); falls back to the flat <terrain>.jpg if missing.
+const IMG = Object.fromEntries(Object.keys(TCOL).map(t => {
+  const img = new Image();
+  img.over = true;
+  img.onload = () => draw();
+  img.onerror = () => { if (img.over) { img.over = false; img.src = `/img/${t}.jpg`; } };
+  img.src = `/img/${t}.png`;
+  return [t, img];
+}));
+
+// Terrain textures: small repeating tiles painted once, used as fill patterns.
+const YIELD = { forest: 'timber', quarry: 'clay', meadow: 'wool', farm: 'grain', mine: 'metal' };
+const tile = (bg, paint) => {
+  const c = document.createElement('canvas'); c.width = c.height = 24;
+  const g = c.getContext('2d'); g.fillStyle = bg; g.fillRect(0, 0, 24, 24); paint(g);
+  return ctx.createPattern(c, 'repeat');
+};
+const PAT = {
+  forest: tile(TCOL.forest, g => {
+    for (const [x, y] of [[6, 2], [18, 14]]) {
+      g.fillStyle = '#1b5e20'; g.beginPath(); g.moveTo(x, y); g.lineTo(x - 5, y + 9); g.lineTo(x + 5, y + 9); g.fill();
+      g.fillStyle = '#4e342e'; g.fillRect(x - 1, y + 9, 2, 2);
+    }
+  }),
+  quarry: tile(TCOL.quarry, g => {
+    g.strokeStyle = '#7a3b1e'; g.lineWidth = 1.5;
+    g.strokeRect(0, 0, 12, 12); g.strokeRect(12, 0, 12, 12); g.strokeRect(-6, 12, 12, 12); g.strokeRect(6, 12, 12, 12); g.strokeRect(18, 12, 12, 12);
+  }),
+  meadow: tile(TCOL.meadow, g => {
+    g.strokeStyle = '#689f38'; g.lineWidth = 1.5;
+    for (const [x, y] of [[5, 8], [17, 20], [15, 5]]) { g.beginPath(); g.moveTo(x - 3, y - 4); g.lineTo(x, y); g.lineTo(x + 3, y - 4); g.moveTo(x, y); g.lineTo(x, y - 5); g.stroke(); }
+  }),
+  farm: tile(TCOL.farm, g => {
+    g.strokeStyle = '#b8901e'; g.lineWidth = 2;
+    for (const o of [-24, -12, 0, 12, 24]) { g.beginPath(); g.moveTo(o, 24); g.lineTo(o + 24, 0); g.stroke(); }
+  }),
+  mine: tile(TCOL.mine, g => {
+    g.fillStyle = '#37474f'; for (const [x, y] of [[4, 5], [16, 9], [9, 18], [21, 21]]) { g.beginPath(); g.arc(x, y, 2.5, 0, 7); g.fill(); }
+    g.fillStyle = '#cfd8dc'; for (const [x, y] of [[12, 3], [3, 13], [19, 15]]) g.fillRect(x, y, 2, 2);
+  }),
+  desert: tile(TCOL.desert, g => { // wind-rippled dunes
+    g.strokeStyle = '#c9a25a'; g.lineWidth = 1.5;
+    for (const y of [5, 13, 21]) { g.beginPath(); g.moveTo(0, y); g.quadraticCurveTo(6, y - 4, 12, y); g.quadraticCurveTo(18, y + 4, 24, y); g.stroke(); }
+  }),
+};
+let view = { s: 1, ox: 0, oy: 0 };
+const TILT = .8; // board seen at an angle: vertical squash so tiles read wider than tall
+const P = (x, y) => [view.ox + x * view.s, view.oy + y * view.s * TILT];
+const mid = e => ({ x: (S.board.vertices[e.a].x + S.board.vertices[e.b].x) / 2, y: (S.board.vertices[e.a].y + S.board.vertices[e.b].y) / 2 });
+
+function fit() {
+  if (!S?.board) return;
+  const r = cv.getBoundingClientRect(), dpr = devicePixelRatio || 1;
+  for (const c of [cv, layer]) { c.width = r.width * dpr; c.height = r.height * dpr; }
+  for (const c of [seaCtx, layerCtx]) c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const xs = S.board.vertices.map(v => v.x), ys = S.board.vertices.map(v => v.y);
+  const x0 = Math.min(...xs) - 0.8, x1 = Math.max(...xs) + 0.8, y0 = Math.min(...ys) - 0.8, y1 = Math.max(...ys) + 0.8;
+  const s = Math.min(r.width / (x1 - x0), r.height / ((y1 - y0) * TILT)) * .88; // < 1 leaves breathing room around the island
+  base = { s, ox: (r.width - s * (x1 - x0)) / 2 - s * x0, oy: (r.height - s * TILT * (y1 - y0)) / 2 - s * TILT * y0 };
+  applyCam();
+}
+
+// Camera: zoom z and pan (dx, dy) in screen px on top of the fitted view. Survives state updates.
+let base = view, cam = { z: 1, dx: 0, dy: 0 };
+function applyCam() {
+  if (cam.z <= 1) cam = { z: 1, dx: 0, dy: 0 };
+  view = { s: base.s * cam.z, ox: base.ox * cam.z + cam.dx, oy: base.oy * cam.z + cam.dy };
+  draw();
+}
+function zoomAt(mx, my, f) {
+  const z = Math.min(4, Math.max(1, cam.z * f)), k = z / cam.z;
+  cam = { z, dx: mx - (mx - cam.dx) * k, dy: my - (my - cam.dy) * k };
+  applyCam();
+}
+const zoomMid = f => { const r = cv.getBoundingClientRect(); zoomAt(r.width / 2, r.height / 2, f); };
+cv.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r = cv.getBoundingClientRect();
+  zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY * .0015));
+}, { passive: false });
+let drag = null, dragged = false;
+cv.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY }; dragged = false; });
+addEventListener('pointermove', e => {
+  if (!drag || cam.z === 1) return;
+  const ddx = e.clientX - drag.x, ddy = e.clientY - drag.y;
+  if (!dragged && Math.hypot(ddx, ddy) < 5) return; // small wobble is still a click
+  dragged = true; drag = { x: e.clientX, y: e.clientY };
+  cam.dx += ddx; cam.dy += ddy; applyCam();
+});
+addEventListener('pointerup', () => { drag = null; });
+$('zIn').onclick = () => zoomMid(1.4);
+$('zOut').onclick = () => zoomMid(1 / 1.4);
+$('zReset').onclick = () => { cam = { z: 1, dx: 0, dy: 0 }; applyCam(); };
+$('zMute').onclick = () => setMute(!muted);
+setMute(muted);
+new ResizeObserver(fit).observe(cv); // also catches hidden -> visible, unlike window 'resize'
+
+function targets() {
+  if (!S?.board || !mine()) return null;
+  if (S.phase === 'main' && S.step === 'pirate') return { kind: 'h', ids: S.board.hexes.map((_, i) => i).filter(i => i !== S.board.pirate) };
+  const build = S.phase === 'setup' ? S.step : mode;
+  if (!S.legal || !build) return null;
+  return { kind: build === 'route' ? 'e' : 'v', ids: S.legal[build + 's'], build };
+}
+
+function draw() {
+  if (!S?.board) return;
+  const r = cv.getBoundingClientRect(), B = S.board, V = B.vertices, s = view.s;
+  const path = pts => { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, ...P(x, y))); };
+  const line = (pts, w, col) => { path(pts); ctx.lineWidth = w * s; ctx.strokeStyle = col; ctx.lineCap = 'round'; ctx.stroke(); };
+  const circle = (x, y, rad, fill, stroke) => { ctx.beginPath(); ctx.arc(...P(x, y), rad * s, 0, 7); ctx.fillStyle = fill; ctx.fill(); if (stroke) { ctx.lineWidth = .04 * s; ctx.strokeStyle = stroke; ctx.stroke(); } };
+  const text = (t, x, y, size, col) => { ctx.font = `bold ${size * s}px system-ui`; ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t, ...P(x, y)); };
+  // k shrinks the hex toward its centre (gap between tiles), dy shifts it down (tile thickness)
+  const hexPath = (h, k = 1, dy = 0) => { path(h.corners.map(v => [h.x + (V[v].x - h.x) * k, h.y + (V[v].y - h.y) * k + dy])); ctx.closePath(); };
+  const K = .93, DEPTH = .13;
+
+  ctx.clearRect(0, 0, r.width, r.height); // sea is painted underneath by frame()
+
+  // Shore: enlarged hexes unioned into rings around the island (shallows, wet sand, dry sand).
+  for (const [k, col] of [[1.42, '#2d6e98'], [1.3, '#3f88ad'], [1.2, '#c9ad72'], [1.12, '#e2cb92']]) {
+    ctx.fillStyle = col;
+    for (const h of B.hexes) { hexPath(h, k); ctx.fill(); }
+  }
+
+  for (const e of B.edges) if (e.port) {
+    const a = V[e.a], b = V[e.b], h = B.hexes[e.hexes[0]], m = mid(e), px = m.x + (m.x - h.x) * .75, py = m.y + (m.y - h.y) * .75;
+    // boardwalks from both port corners out to the pier
+    for (const v of [a, b]) { line([[v.x, v.y], [px, py]], .13, '#4a321d'); line([[v.x, v.y], [px, py]], .08, '#b98a54'); }
+    // pier platform, turned to face out to sea, with plank seams and mooring posts
+    const [cx, cy] = P(px, py), w = .62 * s, d = .4 * s;
+    ctx.save();
+    ctx.translate(cx, cy); ctx.rotate(Math.atan2((py - h.y) * TILT, px - h.x) + Math.PI / 2);
+    ctx.shadowColor = '#0008'; ctx.shadowBlur = .15 * s; ctx.shadowOffsetY = .05 * s;
+    ctx.fillStyle = '#a8743f'; ctx.fillRect(-w / 2, -d / 2, w, d);
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = '#6b4423'; ctx.lineWidth = .02 * s; ctx.strokeRect(-w / 2, -d / 2, w, d);
+    for (let i = 1; i < 5; i++) { const x = -w / 2 + i * w / 5; ctx.beginPath(); ctx.moveTo(x, -d / 2); ctx.lineTo(x, d / 2); ctx.stroke(); }
+    ctx.fillStyle = '#3e2a17';
+    for (const [x, y] of [[-w / 2, -d / 2], [w / 2, -d / 2], [-w / 2, d / 2], [w / 2, d / 2]]) { ctx.beginPath(); ctx.arc(x, y, .045 * s, 0, 7); ctx.fill(); }
+    ctx.restore();
+    // trade badge on the pier
+    circle(px, py, .2, '#f3e5c4', '#7a5c2e');
+    text(e.port === 'any' ? '3:1' : '2:1', px, py - .06, .11, '#3b2a12');
+    text(e.port === 'any' ? '?' : ICON[e.port], px, py + .07, .11, '#3b2a12');
+  }
+
+  // Dirt roads along every tile edge; they fill the gaps between tiles. Built routes are drawn over them later.
+  for (const e of B.edges) {
+    const pts = [[V[e.a].x, V[e.a].y], [V[e.b].x, V[e.b].y]];
+    line(pts, .17, '#6b4a2b'); line(pts, .11, '#a8834f');
+  }
+
+  // Tile sides + drop shadow first, so every top sits on its own raised base.
+  for (const h of B.hexes) {
+    ctx.save();
+    ctx.shadowColor = '#000b'; ctx.shadowBlur = .3 * s; ctx.shadowOffsetY = .1 * s;
+    hexPath(h, K, DEPTH); ctx.fillStyle = '#5b3d27'; ctx.fill();
+    ctx.restore();
+  }
+
+  // Tile tops, back row first, so overhang art (trees, peaks) from a front tile covers the one behind.
+  const hw = K * Math.sqrt(3) / 2;
+  for (const h of [...B.hexes].sort((a, b) => a.y - b.y)) {
+    const img = IMG[h.terrain], ok = img.complete && img.naturalWidth;
+    hexPath(h, K); ctx.fillStyle = PAT[h.terrain]; ctx.fill();
+    ctx.save();
+    if (ok && img.over) {
+      // hexagon + the column above its top edges; png layout is 256x444 with the hex in the bottom 296px
+      path([[h.x + hw, h.y - K / 2], [h.x + hw, h.y + K / 2], [h.x, h.y + K], [h.x - hw, h.y + K / 2], [h.x - hw, h.y - K / 2], [h.x - hw, h.y - 2 * K], [h.x + hw, h.y - 2 * K]]);
+      ctx.clip();
+      ctx.drawImage(img, ...P(h.x - hw, h.y - 2 * K), 2 * hw * s, 3 * K * s * TILT);
+    } else {
+      ctx.clip();
+      if (ok) ctx.drawImage(img, ...P(h.x - hw, h.y - K), 2 * hw * s, 2 * K * s * TILT);
+    }
+    ctx.restore();
+  }
+
+  // Tokens last so overhang never hides a number.
+  B.hexes.forEach((h, i) => {
+    if (h.num) {
+      const hot = h.num === 6 || h.num === 8;
+      ctx.save(); ctx.shadowColor = '#0009'; ctx.shadowBlur = .12 * s; ctx.shadowOffsetY = .05 * s;
+      circle(h.x, h.y, .3, '#f6efd9', '#5d4a2a');
+      ctx.restore();
+      text(h.num, h.x, h.y - .04, .24, hot ? '#c62828' : '#222');
+      text('•'.repeat(6 - Math.abs(7 - h.num)), h.x, h.y + .17, .12, hot ? '#c62828' : '#222');
+    }
+    if (i === B.pirate) { circle(h.x, h.y - .55, .2, '#111', '#000'); text('☠', h.x, h.y - .55, .24, '#fff'); }
+  });
+
+  // Roads: each player's whole network is stroked as ONE path (outline, curb, cobbles), so bends are
+  // seamless rounded joins instead of separate pieces meeting.
+  S.players.forEach((pl, p) => {
+    const mine = B.edges.filter(e => e.owner === p);
+    if (!mine.length) return;
+    ctx.beginPath();
+    for (const e of mine) { ctx.moveTo(...P(V[e.a].x, V[e.a].y)); ctx.lineTo(...P(V[e.b].x, V[e.b].y)); }
+    if (!ready(PIECE.route)) { ctx.lineWidth = .2 * s; ctx.strokeStyle = '#000a'; ctx.stroke(); ctx.lineWidth = .12 * s; ctx.strokeStyle = pl.color; ctx.stroke(); return; }
+    const th = .19 * s;
+    ctx.lineCap = ctx.lineJoin = 'round';
+    ctx.save(); ctx.shadowColor = '#0009'; ctx.shadowBlur = .08 * s; ctx.shadowOffsetY = .03 * s;
+    ctx.lineWidth = th * 1.2; ctx.strokeStyle = '#000b'; ctx.stroke(); // outline
+    ctx.restore();
+    ctx.lineWidth = th; ctx.strokeStyle = pl.color; ctx.stroke();      // curb
+    ctx.lineWidth = th * .78; ctx.strokeStyle = '#0006'; ctx.stroke(); // curb seam
+    const cb = cobbles(pl.color);
+    cb.pat.setTransform(new DOMMatrix().scale(th * .7 / cb.h));
+    ctx.lineWidth = th * .7; ctx.strokeStyle = cb.pat; ctx.stroke();   // cobblestones from the road art
+  });
+
+  const t = targets();
+  if (t) for (const id of t.ids) {
+    if (t.kind === 'v') circle(V[id].x, V[id].y, .13, '#fff6', '#fff');
+    else if (t.kind === 'e') { const e = B.edges[id]; line([[V[e.a].x, V[e.a].y], [V[e.b].x, V[e.b].y]], .1, '#ffffffaa'); }
+    else { hexPath(B.hexes[id]); ctx.lineWidth = .07 * s; ctx.strokeStyle = '#ffeb3b'; ctx.stroke(); }
+  }
+
+  const built = V.filter(v => v.owner !== null).sort((a, b) => a.y - b.y);
+  // Clearings: level ground under each building so it doesn't sit on treetops or peaks.
+  for (const v of built) {
+    const [x, y] = P(v.x, v.y), rx = (v.town ? .6 : .48) * s, ry = rx * .62 * TILT / .8;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, rx);
+    g.addColorStop(0, '#7d6440'); g.addColorStop(.62, '#8c7148'); g.addColorStop(1, '#8c714800');
+    ctx.save(); ctx.translate(x, y); ctx.scale(1, ry / rx); ctx.translate(-x, -y);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rx, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+  // Buildings back-to-front so nearer ones overlap farther ones.
+  for (const v of built) {
+    const c = S.players[v.owner].color, img = PIECE[v.town ? 'town' : 'outpost'];
+    if (ready(img)) {
+      const w = (v.town ? .95 : .75) * s, h = w * img.naturalHeight / img.naturalWidth, [x, y] = P(v.x, v.y);
+      ctx.save(); ctx.shadowColor = '#000a'; ctx.shadowBlur = .12 * s; ctx.shadowOffsetY = .05 * s;
+      ctx.drawImage(tint(img, c), x - w / 2, y - h * .7, w, h); // base platform centred on the corner
+      ctx.restore();
+    } else if (v.town) { const [x, y] = P(v.x, v.y), z = .22 * s; ctx.fillStyle = c; ctx.fillRect(x - z, y - z, 2 * z, 2 * z); ctx.lineWidth = .05 * s; ctx.strokeStyle = '#000'; ctx.strokeRect(x - z, y - z, 2 * z, 2 * z); }
+    else circle(v.x, v.y, .16, c, '#000');
+  }
+}
+
+// Player pieces: white art from cut_tile.py, tinted per player (multiply keeps the painted shading).
+const PIECE = Object.fromEntries(['outpost', 'town', 'route'].map(n => [n, Object.assign(new Image(), { src: `/img/${n}.png`, onload: () => draw() })]));
+const ready = img => img.complete && img.naturalWidth;
+const tinted = new Map();
+function tint(img, color) {
+  const key = img.src + color;
+  if (!tinted.has(key)) {
+    const c = document.createElement('canvas'), g = c.getContext('2d');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    g.drawImage(img, 0, 0);
+    g.globalCompositeOperation = 'multiply'; g.fillStyle = color; g.fillRect(0, 0, c.width, c.height);
+    g.globalCompositeOperation = 'destination-in'; g.drawImage(img, 0, 0); // restore the sprite's transparency
+    tinted.set(key, c);
+  }
+  return tinted.get(key);
+}
+// Repeating cobblestone pattern: the curb-free middle of the tinted road art.
+function cobbles(color) {
+  const key = 'cob' + color;
+  if (!tinted.has(key)) {
+    const img = PIECE.route, t = tint(img, color), c = document.createElement('canvas');
+    const sx = img.naturalWidth * .3, sy = img.naturalHeight * .2, sw = Math.round(img.naturalWidth * .3), sh = Math.round(img.naturalHeight * .6);
+    c.width = sw; c.height = sh;
+    c.getContext('2d').drawImage(t, sx, sy, sw, sh, 0, 0, sw, sh);
+    tinted.set(key, { pat: ctx.createPattern(c, 'repeat'), h: sh });
+  }
+  return tinted.get(key);
+}
+
+// ---------- animated sea (world coords, so it zooms/pans with the board) ----------
+const WAVES = Array.from({ length: 260 }, () => ({ x: (Math.random() * 2 - 1) * 9, y: (Math.random() * 2 - 1) * 8, p: Math.random() * 6.28 }));
+// Far out past the docks, small and hazy, so they read as background scenery, not game pieces.
+const SHIPS = [{ rx: 6.8, ry: 6.3, v: .03, p: 0 }, { rx: 7.5, ry: 6.9, v: -.022, p: 2.4 }, { rx: 8.2, ry: 7.4, v: .017, p: 4.3 }];
+
+const SHIP_IMG = Object.assign(new Image(), { src: '/img/ship.png' }); // right-facing sprite from cut_tile.py
+
+function ship(c, x, y, k, dir, t) {
+  c.save();
+  c.translate(x, y + Math.sin(t * 2 + x) * k * .04); // bob
+  if (SHIP_IMG.complete && SHIP_IMG.naturalWidth) {
+    c.scale(dir, 1);
+    c.strokeStyle = 'rgba(255,255,255,.45)'; c.lineWidth = .05 * k; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(-.7 * k, -.02 * k); c.quadraticCurveTo(-1.2 * k, -.08 * k, -1.7 * k, .02 * k); c.stroke();
+    const w = 2 * k, h = w * SHIP_IMG.naturalHeight / SHIP_IMG.naturalWidth;
+    c.drawImage(SHIP_IMG, -w / 2, -h * .93, w, h); // hull bottom sits on the water at y
+    c.restore();
+    return;
+  }
+  c.scale(dir * k, k);
+  c.strokeStyle = 'rgba(255,255,255,.45)'; c.lineWidth = .05; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(-.5, .14); c.quadraticCurveTo(-.9, .08, -1.35, .18); c.moveTo(-.45, .2); c.quadraticCurveTo(-.8, .26, -1.1, .3); c.stroke();
+  c.fillStyle = '#5d3a1a'; c.beginPath(); c.moveTo(-.48, 0); c.lineTo(.52, 0); c.lineTo(.36, .2); c.lineTo(-.36, .2); c.closePath(); c.fill();
+  c.strokeStyle = '#3b2410'; c.lineWidth = .05; c.beginPath(); c.moveTo(0, 0); c.lineTo(0, -.75); c.stroke();
+  c.fillStyle = '#f4ecd8';
+  c.beginPath(); c.moveTo(.04, -.7); c.lineTo(.42, -.08); c.lineTo(.04, -.08); c.fill();
+  c.beginPath(); c.moveTo(-.04, -.64); c.lineTo(-.36, -.1); c.lineTo(-.04, -.1); c.fill();
+  c.fillStyle = '#c62828'; c.fillRect(0, -.84, .16, .09);
+  c.restore();
+}
+
+function drawSea(t, w, h) {
+  const c = seaCtx, s = view.s, B = S.board, V = B.vertices;
+  c.fillStyle = '#17426e'; c.fillRect(0, 0, w, h);
+
+  // surf: one union path of slightly-larger hexes, breathing in and out just past the shallows
+  const k = 1.5 + .05 * Math.sin(t * 1.3);
+  c.beginPath();
+  for (const hx of B.hexes) hx.corners.forEach((v, i) => (i ? c.lineTo : c.moveTo).call(c, ...P(hx.x + (V[v].x - hx.x) * k, hx.y + (V[v].y - hx.y) * k)));
+  c.fillStyle = `rgba(190,230,250,${.16 + .06 * Math.sin(t * 1.3)})`; c.fill('nonzero');
+
+  // wave marks drifting and shimmering
+  c.lineCap = 'round'; c.lineWidth = .03 * s;
+  for (const wv of WAVES) {
+    const [px, py] = P(wv.x + Math.sin(t * .35 + wv.p) * .18, wv.y), L = .2 * s;
+    if (px < -L || px > w + L || py < -L || py > h + L) continue;
+    c.strokeStyle = `rgba(150,205,240,${.18 + .17 * Math.sin(t * .8 + wv.p * 2)})`;
+    c.beginPath(); c.moveTo(px - L, py); c.quadraticCurveTo(px - L / 2, py - L * .4, px, py); c.quadraticCurveTo(px + L / 2, py - L * .4, px + L, py); c.stroke();
+  }
+
+  // ships circling the island
+  for (const sh of SHIPS) {
+    const a = sh.p + t * sh.v, x = Math.cos(a) * sh.rx, y = Math.sin(a) * sh.ry;
+    const dx = -Math.sin(a) * sh.v; // heading along the ellipse
+    c.globalAlpha = .75;
+    ship(c, ...P(x, y), .4 * s, dx >= 0 ? 1 : -1, t);
+    c.globalAlpha = 1;
+  }
+}
+
+function frame(ms) {
+  requestAnimationFrame(frame);
+  if (!S?.board) return;
+  const r = cv.getBoundingClientRect();
+  if (!r.width) return;
+  drawSea(ms / 1000, r.width, r.height);
+  seaCtx.drawImage(layer, 0, 0, r.width, r.height);
+}
+requestAnimationFrame(frame);
+
+// /?preview: just draw a random board, no players. Click to generate another.
+const PREVIEW = new URLSearchParams(location.search).has('preview');
+async function preview() {
+  S = { board: await (await fetch('/board')).json(), players: [], phase: 'preview' };
+  $('lobby').classList.add('hidden'); $('side').classList.add('hidden'); $('game').classList.remove('hidden');
+  $('banner').textContent = 'Preview — click for a new board'; $('banner').classList.remove('hidden');
+  fit();
+}
+if (PREVIEW) { socket.disconnect(); preview(); }
+
+cv.onclick = e => {
+  if (dragged) return; // end of a pan, not a click
+  if (PREVIEW) return preview();
+  const t = targets();
+  if (!t) return;
+  const r = cv.getBoundingClientRect(), x = (e.clientX - r.left - view.ox) / view.s, y = (e.clientY - r.top - view.oy) / (view.s * TILT), B = S.board;
+  const pos = id => (t.kind === 'v' ? B.vertices[id] : t.kind === 'h' ? B.hexes[id] : mid(B.edges[id]));
+  let best = null, bd = t.kind === 'h' ? 0.9 : 0.4;
+  for (const id of t.ids) { const p = pos(id), d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = id; } }
+  if (best === null) return;
+  if (t.kind === 'h') act('pirate', { hex: best });
+  else { act('build', { kind: t.build, id: best }); mode = null; }
+};
+</script>
+</body>
+</html>
