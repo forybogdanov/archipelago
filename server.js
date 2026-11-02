@@ -71,7 +71,7 @@ function genBoard() {
     const e = coast[(off + Math.floor(i * coast.length / types.length)) % coast.length];
     e.port = vertices[e.a].port = vertices[e.b].port = t;
   });
-  return { hexes, vertices, edges, pirate: hexes.findIndex(h => h.terrain === 'desert') };
+  return { hexes, vertices, edges, bandit: hexes.findIndex(h => h.terrain === 'desert') };
 }
 
 // ---------- rules ----------
@@ -157,6 +157,7 @@ const ACT = {
     if (R.phase === 'setup') {
       need(kind === R.step && L[kind + 's'].includes(id), 'Illegal placement');
       const n = R.players.length;
+      log(R, `${p.name} placed a${kind === 'outpost' ? 'n' : ''} ${kind}`);
       if (kind === 'outpost') {
         b.vertices[id].owner = i; R.lastOutpost = id; R.step = 'route';
         if (R.setupIdx >= n) for (const h of b.vertices[id].hexes) { const r = YIELD[b.hexes[h].terrain]; if (r) p.res[r]++; }
@@ -187,12 +188,12 @@ const ACT = {
       R.discard = {};
       R.players.forEach((p, j) => { const t = total(p.res); if (t > 7) R.discard[j] = Math.floor(t / 2); });
       R.resume = 'act';
-      R.step = Object.keys(R.discard).length ? 'discard' : 'pirate';
-      log(R, '🏴‍☠️ The Pirate Fleet appears!');
+      R.step = Object.keys(R.discard).length ? 'discard' : 'bandit';
+      log(R, '🗡️ Bandits raid the island!');
       return;
     }
     b.hexes.forEach((h, hi) => {
-      if (h.num !== s || hi === b.pirate) return;
+      if (h.num !== s || hi === b.bandit) return;
       for (const v of h.corners) { const V = b.vertices[v]; if (V.owner !== null) R.players[V.owner].res[YIELD[h.terrain]] += V.town ? 2 : 1; }
     });
     R.step = 'act';
@@ -205,14 +206,14 @@ const ACT = {
     need(has(p.res, b), "You don't have those goods");
     pay(p.res, b);
     delete R.discard[i];
-    if (!Object.keys(R.discard).length) R.step = 'pirate';
+    if (!Object.keys(R.discard).length) R.step = 'bandit';
   },
 
-  pirate(R, i, { hex }) {
+  bandit(R, i, { hex }) {
     const b = R.board;
-    need(R.step === 'pirate', 'Not now');
-    need(Number.isInteger(hex) && hex >= 0 && hex < b.hexes.length && hex !== b.pirate, 'Pick another hex');
-    b.pirate = hex;
+    need(R.step === 'bandit', 'Not now');
+    need(Number.isInteger(hex) && hex >= 0 && hex < b.hexes.length && hex !== b.bandit, 'Pick another hex');
+    b.bandit = hex;
     R.victims = [...new Set(b.hexes[hex].corners.map(v => b.vertices[v].owner))].filter(o => o !== null && o !== i && total(R.players[o].res) > 0);
     if (R.victims.length === 1) steal(R, i, R.victims[0]);
     else if (R.victims.length) R.step = 'steal';
@@ -245,7 +246,7 @@ const ACT = {
     }
     p.cards.splice(k, 1);
     R.cardPlayed = true;
-    if (card === 'captain') { p.captains++; R.resume = R.step; R.step = 'pirate'; }
+    if (card === 'captain') { p.captains++; R.resume = R.step; R.step = 'bandit'; }
     log(R, `${p.name} played ${card === 'captain' ? 'a Captain' : 'a Resource Boon'}`);
   },
 
@@ -300,9 +301,31 @@ const ACT = {
 
   chat(R, i, { text }) {
     const t = String(text || '').trim().slice(0, 200);
+    if (t.startsWith('/')) return cheat(R, i, t);
     if (t) log(R, `💬 ${R.players[i].name}: ${t}`);
   },
 };
+
+// Test cheats, typed in chat. Only with `node server.js --cheats` (npm run cheat); always announced in the log.
+//   /give [n]            n of every good (default 5)
+//   /give <good> [n]     n of one good, e.g. /give metal 3
+//   /card <type>         playable card now: captain | boon | renown
+const CHEATS = process.argv.includes('--cheats');
+function cheat(R, i, cmd) {
+  need(CHEATS, 'Cheats are off (start the server with npm run cheat)');
+  need(R.phase === 'main' || R.phase === 'setup', 'Start a game first');
+  const p = R.players[i], [name, a, b] = cmd.slice(1).toLowerCase().split(/\s+/);
+  if (name === 'give') {
+    const good = RES.includes(a) ? a : null, n = Math.max(1, Math.min(99, parseInt(good ? b : a) || 5));
+    need(good || !a || /^\d+$/.test(a), `Unknown good: ${a} (${RES.join(', ')})`);
+    for (const k of good ? [good] : RES) p.res[k] += n;
+    log(R, `🧪 ${p.name} cheated in ${n} ${good || 'of every good'}`);
+  } else if (name === 'card') {
+    need(['captain', 'boon', 'renown'].includes(a), 'Usage: /card captain|boon|renown');
+    p.cards.push(a);
+    log(R, `🧪 ${p.name} cheated in a ${a} card`);
+  } else need(false, 'Cheats: /give [n], /give <good> [n], /card captain|boon|renown');
+}
 
 // Single entry point for every game action (sockets and tests both go through here).
 function act(R, i, type, a = {}) {

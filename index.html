@@ -92,9 +92,9 @@
 const RES = ['timber', 'clay', 'wool', 'grain', 'metal'];
 const ICON = { timber: '🌲', clay: '🧱', wool: '🐑', grain: '🌾', metal: '⛏️' };
 const TCOL = { forest: '#2e7d32', quarry: '#b8643a', meadow: '#9ccc65', farm: '#e9c046', mine: '#607d8b', desert: '#e3c27a' };
-const STEP = { outpost: 'place an outpost', route: 'place a shipping route', roll: 'roll the dice', discard: 'pirates! players are discarding',
-  pirate: 'move the Pirate Fleet (click a hex)', steal: 'choose whom to rob', act: 'trade, build, end turn' };
-const CARD = { captain: '⚓ Captain — move the pirates & steal', boon: '🎁 Resource Boon — take any 2 goods', renown: '⭐ Renown — +1 point (secret)' };
+const STEP = { outpost: 'place an outpost', route: 'place a shipping route', roll: 'roll the dice', discard: 'bandits! players are discarding',
+  bandit: 'move the bandits (click a hex)', steal: 'choose whom to rob', act: 'trade, build, end turn' };
+const CARD = { captain: '⚓ Captain — move the bandits & steal', boon: '🎁 Resource Boon — take any 2 goods', renown: '⭐ Renown — +1 point (secret)' };
 
 const $ = id => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
@@ -123,23 +123,67 @@ socket.on('state', s => { sounds(S, s); S = s; ss.set('joined', '1'); render(); 
 // Files live in /sfx/<name>.mp3; a missing file is simply silent.
 const SFX = {};
 let muted = ss.get('mute') === '1';
-function sfx(name) {
+function sfx(name, volume = 1) {
   if (muted) return;
   const a = SFX[name] ??= new Audio(`/sfx/${name}.mp3`);
-  a.currentTime = 0;
+  a.currentTime = 0; a.volume = volume;
   a.play().catch(() => {}); // missing file or autoplay blocked: stay quiet
 }
 const handSize = s => s?.my ? RES.reduce((n, k) => n + s.my.res[k], 0) : 0;
 // Compare old and new state; only entries logged since the last update count.
 function sounds(old, s) {
-  if (!old || old.phase === 'lobby' || s.phase === 'lobby') return;
-  const fresh = s.log.slice(-Math.min(s.logSeq - (old.logSeq || 0), s.log.length));
-  if (fresh.some(m => !m.startsWith('💬') && / rolled \d+$/.test(m))) {
+  if (!old) return;
+  const n = Math.min(s.logSeq - (old.logSeq || 0), s.log.length);
+  const fresh = n > 0 ? s.log.slice(-n) : []; // slice(-0) would be the whole log
+  // chat from someone else (works in the lobby too)
+  if (fresh.some(m => m.startsWith('💬') && !m.startsWith(`💬 ${s.players[s.me]?.name}:`))) sfx('chat', .7);
+  if (s.phase === 'lobby') { if (s.players.length > old.players.length) sfx('join'); return; }
+  if (old.phase === 'lobby') return;
+  if (s.phase === 'over' && old.phase !== 'over') return sfx('win');
+  // longest route / largest fleet changed hands
+  if ((s.longest !== null && s.longest !== old.longest) || (s.fleet !== null && s.fleet !== old.fleet)) setTimeout(() => sfx('award'), 400);
+  const has = re => fresh.some(m => !m.startsWith('💬') && re.test(m)); // chat can't fake events
+  if (has(/ rolled \d+$/)) {
     sfx('dice');
     if (handSize(s) > handSize(old)) setTimeout(() => sfx('gain'), 900); // after the dice settle
   }
+  if (has(/Bandits raid/)) setTimeout(() => sfx('bandits'), 700);
+  if (has(/ (built|placed) an? (route|outpost|town)$/)) sfx('build');
+  if (has(/ bought an expedition card$/)) sfx('buy');
+  if (has(/ played (a Captain|a Resource Boon)$/)) sfx('card');
+  // trade offers aren't logged: a new offer from someone else shows up as a changed s.trade
+  const offer = t => t && JSON.stringify([t.from, t.give, t.want]);
+  if (s.trade && s.trade.from !== s.me && offer(s.trade) !== offer(old.trade)) sfx('trade');
+  // someone accepted MY offer
+  if (s.trade?.from === s.me && offer(s.trade) === offer(old.trade) && s.trade.accepts.length > (old.trade?.accepts.length || 0)) sfx('accepted');
 }
-function setMute(m) { muted = m; ss.set('mute', m ? '1' : '0'); $('zMute').textContent = m ? '🔇' : '🔊'; }
+// soft click on every enabled button (test-panel buttons opt out with data-quiet)
+document.addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled && !b.dataset.quiet) sfx('click', .6); });
+
+function setMute(m) {
+  muted = m; ss.set('mute', m ? '1' : '0'); $('zMute').textContent = m ? '🔇' : '🔊';
+  if (ambience) ambience.gain.gain.value = m ? 0 : SEA_VOLUME;
+}
+
+// Ambience: gapless sea loop (Web Audio, so no click at the loop point) + gulls now and then.
+// Browsers only allow audio after the user interacts, so it starts on the first click/key.
+const SEA_VOLUME = .25;
+let ambience = null;
+async function startAmbience() {
+  if (ambience) return;
+  const ac = new AudioContext(), gain = ac.createGain();
+  gain.gain.value = muted ? 0 : SEA_VOLUME; gain.connect(ac.destination);
+  ambience = { ac, gain };
+  try {
+    const src = ac.createBufferSource();
+    src.buffer = await ac.decodeAudioData(await (await fetch('/sfx/sea_loop.mp3')).arrayBuffer());
+    src.loop = true; src.connect(gain); src.start();
+  } catch {} // no sea file: just gulls
+  const gulls = () => setTimeout(() => { sfx('gulls', .5); gulls(); }, 30000 + Math.random() * 30000);
+  gulls();
+}
+addEventListener('pointerdown', startAmbience);
+addEventListener('keydown', startAmbience);
 
 $('name').value = ss.get('name') || '';
 $('joinBtn').onclick = () => { ss.set('name', $('name').value); socket.emit('join', { name: $('name').value, pid }); };
@@ -254,7 +298,7 @@ function renderModal() {
       el('div', { className: 'row' }, btn('View board', () => $('modal').classList.add('hidden')), S.isHost ? btn('New game', () => socket.emit('start')) : ''));
   } else if (key.startsWith('discard')) {
     const ins = RES.map(k => el('input', { type: 'number', min: 0, max: S.my.res[k], value: 0, className: 'qty' }));
-    m.append(el('h2', {}, `🏴‍☠️ Discard ${S.discard} goods`),
+    m.append(el('h2', {}, `🗡️ Bandits! Discard ${S.discard} goods`),
       el('div', { className: 'res' }, ...RES.map((k, i) => el('div', {}, `${ICON[k]} ${S.my.res[k]}`, ins[i]))),
       btn('Discard', () => act('discard', { res: Object.fromEntries(RES.map((k, i) => [k, +ins[i].value || 0])) })));
   } else if (key.startsWith('steal')) {
@@ -374,7 +418,7 @@ new ResizeObserver(fit).observe(cv); // also catches hidden -> visible, unlike w
 
 function targets() {
   if (!S?.board || !mine()) return null;
-  if (S.phase === 'main' && S.step === 'pirate') return { kind: 'h', ids: S.board.hexes.map((_, i) => i).filter(i => i !== S.board.pirate) };
+  if (S.phase === 'main' && S.step === 'bandit') return { kind: 'h', ids: S.board.hexes.map((_, i) => i).filter(i => i !== S.board.bandit) };
   const build = S.phase === 'setup' ? S.step : mode;
   if (!S.legal || !build) return null;
   return { kind: build === 'route' ? 'e' : 'v', ids: S.legal[build + 's'], build };
@@ -463,7 +507,7 @@ function draw() {
       text(h.num, h.x, h.y - .04, .24, hot ? '#c62828' : '#222');
       text('•'.repeat(6 - Math.abs(7 - h.num)), h.x, h.y + .17, .12, hot ? '#c62828' : '#222');
     }
-    if (i === B.pirate) { circle(h.x, h.y - .55, .2, '#111', '#000'); text('☠', h.x, h.y - .55, .24, '#fff'); }
+    if (i === B.bandit) { circle(h.x, h.y - .55, .2, '#111', '#000'); text('🗡️', h.x, h.y - .55, .22, '#fff'); }
   });
 
   // Roads: each player's whole network is stroked as ONE path (outline, curb, cobbles), so bends are
@@ -609,7 +653,7 @@ function frame(ms) {
   requestAnimationFrame(frame);
   if (!S?.board) return;
   const r = cv.getBoundingClientRect();
-  if (!r.width) return;
+  if (!r.width || !layer.width) return; // not laid out / fitted yet
   drawSea(ms / 1000, r.width, r.height);
   seaCtx.drawImage(layer, 0, 0, r.width, r.height);
 }
@@ -623,7 +667,19 @@ async function preview() {
   $('banner').textContent = 'Preview — click for a new board'; $('banner').classList.remove('hidden');
   fit();
 }
-if (PREVIEW) { socket.disconnect(); preview(); }
+if (PREVIEW) {
+  socket.disconnect(); preview();
+  $('board').style.height = '100vh'; // no side panel here, so the board takes the whole screen (also on narrow layouts)
+  // sound test panel (ignores mute so you can always hear them here)
+  const SOUNDS = { dice: '🎲 Dice', gain: '✨ Gain', build: '🔨 Build', buy: '🪙 Buy card', card: '🃏 Play card', bandits: '🗡️ Bandits', trade: '🔔 Trade offer', accepted: '🤝 Accepted', gulls: '🐦 Gulls', win: '🏆 Win', click: '🖱️ Click', chat: '💬 Chat', join: '🚪 Join', award: '🏅 Award' };
+  $('board').append(el('div', { style: 'position:absolute;left:10px;bottom:10px;display:grid;gap:4px;background:#000a;padding:8px;border-radius:8px' },
+    el('b', { style: 'font-size:12px' }, 'Test sounds'),
+    ...Object.entries(SOUNDS).map(([n, label]) => {
+      const b = btn(label, () => { const a = new Audio(`/sfx/${n}.mp3`); a.play().catch(() => toast(`sfx/${n}.mp3 missing`)); });
+      b.dataset.quiet = '1'; // no extra click sound on top of the one being tested
+      return b;
+    })));
+}
 
 cv.onclick = e => {
   if (dragged) return; // end of a pan, not a click
@@ -635,7 +691,7 @@ cv.onclick = e => {
   let best = null, bd = t.kind === 'h' ? 0.9 : 0.4;
   for (const id of t.ids) { const p = pos(id), d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = id; } }
   if (best === null) return;
-  if (t.kind === 'h') act('pirate', { hex: best });
+  if (t.kind === 'h') act('bandit', { hex: best });
   else { act('build', { kind: t.build, id: best }); mode = null; }
 };
 </script>

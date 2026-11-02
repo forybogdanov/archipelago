@@ -30,7 +30,7 @@ for (let game = 0; game < 20; game++) {
       }
       continue;
     }
-    if (R.step === 'pirate') { assert(ok(i, 'pirate', { hex: pick(B.hexes.map((_, k) => k).filter(k => k !== B.pirate)) })); continue; }
+    if (R.step === 'bandit') { assert(ok(i, 'bandit', { hex: pick(B.hexes.map((_, k) => k).filter(k => k !== B.bandit)) })); continue; }
     if (R.step === 'steal') { assert(ok(i, 'steal', { target: pick(R.victims) })); continue; }
     if (R.step === 'roll') { if (!(p.cards.includes('captain') && Math.random() < .5 && ok(i, 'play', { card: 'captain' }))) assert(ok(i, 'roll')); continue; }
 

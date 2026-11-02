@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
+    "cheat": "node server.js --cheats",
     "test": "node test.js"
   },
   "dependencies": {
