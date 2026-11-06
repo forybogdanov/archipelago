@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { Server } = require('socket.io');
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 const RES = ['timber', 'clay', 'wool', 'grain', 'metal'];
 const YIELD = { forest: 'timber', quarry: 'clay', meadow: 'wool', farm: 'grain', mine: 'metal', desert: null };
 const COST = {
@@ -237,7 +237,7 @@ const ACT = {
 
   play(R, i, { card, res }) {
     const p = R.players[i], k = p.cards.indexOf(card);
-    need(R.step === 'roll' || R.step === 'act', 'Not now');
+    need(R.step === 'act', 'Roll the dice first');
     need(!R.cardPlayed, 'One card per turn');
     need(k >= 0 && card !== 'renown', "You can't play that");
     if (card === 'boon') {
@@ -347,10 +347,10 @@ function act(R, i, type, a = {}) {
 
 function makeRoom(code) { return { code, host: null, players: [], phase: 'lobby', log: [] }; }
 
-function startGame(R) {
+function startGame(R, open = false) {
   shuffle(R.players);
   Object.assign(R, {
-    phase: 'setup', board: genBoard(),
+    phase: 'setup', board: genBoard(), open, // open: everyone sees everyone's goods
     deck: shuffle([...Array(14).fill('captain'), ...Array(4).fill('boon'), ...Array(5).fill('renown')]),
     turn: 0, step: 'outpost', setupIdx: 0, lastOutpost: null, dice: null, discard: {}, victims: [], resume: 'act',
     trade: null, cardPlayed: false, longest: null, fleet: null, winner: null, lens: R.players.map(() => 0),
@@ -367,6 +367,7 @@ function view(R, me) {
     players: R.players.map((p, i) => ({
       name: p.name, color: p.color, connected: p.connected,
       ...(inGame && { hand: total(p.res), cards: p.cards.length + p.fresh.length, captains: p.captains, route: R.lens[i], points: points(R, i, i === me || over) }),
+      ...(inGame && R.open && { res: p.res }),
     })),
   };
   if (!inGame) return base;
@@ -427,10 +428,10 @@ io.on('connection', socket => {
     socket.data.pid = pid;
   }));
 
-  socket.on('start', guard(() => {
+  socket.on('start', guard(({ open }) => {
     need(R.host === socket.data.pid && (R.phase === 'lobby' || R.phase === 'over'), 'Only the host can start');
     need(R.players.length >= 2, 'Need at least 2 players');
-    startGame(R);
+    startGame(R, open === true);
   }));
 
   socket.on('act', guard(({ type, ...a }) => act(R, me(), type, a)));

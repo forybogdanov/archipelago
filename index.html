@@ -35,9 +35,32 @@
   .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; border:1px solid #000 }
   #log { height:150px; overflow-y:auto; font-size:12px; color:var(--mut); margin-bottom:6px }
   #modal { position:fixed; inset:0; background:#000a; display:flex; align-items:center; justify-content:center; z-index:5 }
-  #toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:#b23b3b; padding:8px 14px; border-radius:8px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:6 }
+  #toast { position:fixed; top:56px; left:50%; transform:translateX(-50%); background:#b23b3b; padding:8px 14px; border-radius:8px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:6 }
   #toast.show { opacity:1 }
-  @media (max-width:800px) { #game { flex-direction:column } #board { height:50vh; flex:none } #side { width:100%; flex:1 } }
+  #actions { position:absolute; left:12px; top:50%; transform:translateY(-50%); display:grid; gap:8px; width:170px }
+  #actions button { display:grid; text-align:left; padding:10px 12px; font-size:16px; font-weight:600; background:#16263bee; border:2px solid #3d5a80; box-shadow:0 2px 8px #0008 }
+  #actions button:disabled { opacity:.65 }
+  #actions button small { font-size:12px; font-weight:400; color:var(--mut) }
+  #actions button.on { background:var(--acc); color:#111; border-color:#fff }
+  #actions button.on small { color:#333 }
+  #actions button.end:not(:disabled) { background:#2e7d32; border-color:#66bb6a }
+  #rollBtn { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-size:26px; font-weight:700; padding:18px 34px; background:var(--acc); color:#111; border:3px solid #fff; border-radius:14px; box-shadow:0 6px 24px #000a }
+  #diceShow { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:flex; gap:14px; align-items:center; background:#000a; padding:16px 22px; border-radius:16px; pointer-events:none; animation:pop .45s ease-out; font-size:36px }
+  @keyframes pop { from { transform:translate(-50%,-50%) scale(.3) rotate(-25deg); opacity:0 } }
+  .die { width:72px; height:72px; padding:9px; background:#fbf7ec; border-radius:14px; display:grid; grid-template:repeat(3,1fr)/repeat(3,1fr); box-shadow:inset 0 -4px 0 #0003, 0 4px 10px #0008 }
+  .die .pip { background:#222; border-radius:50%; margin:3px }
+  #turnSplash { position:absolute; left:50%; top:30%; font-size:44px; font-weight:800; color:var(--acc); text-shadow:0 3px 12px #000; white-space:nowrap; pointer-events:none; animation:slide 2s ease-in-out forwards }
+  @keyframes slide { 0% { transform:translate(-150%,-50%); opacity:0 } 20%, 80% { transform:translate(-50%,-50%); opacity:1 } 100% { transform:translate(50%,-50%); opacity:0 } }
+  #cardbar { position:absolute; left:50%; bottom:10px; transform:translateX(-50%); display:flex; gap:8px; max-width:calc(100% - 420px); overflow-x:auto; padding-top:10px }
+  /* per-card art later: .ctile[data-card=captain] { background-image:url(/img/captain.png) } */
+  .ctile { flex:none; width:110px; height:150px; display:grid; grid-template-rows:auto auto 1fr; justify-items:center; gap:4px; padding:8px; background:#f3e5c4 center/cover no-repeat; color:#3b2a12; border:2px solid #7a5c2e; border-radius:10px; box-shadow:0 4px 12px #000a; text-align:center; transition:transform .15s }
+  .ctile:not(:disabled):hover { transform:translateY(-8px); border-color:var(--acc) }
+  .ctile:disabled.kept { opacity:1 }
+  .ctile .cicon { font-size:40px }
+  .ctile small { font-size:11px }
+  .goods { font-size:12px; padding:0 6px 4px 22px }
+  @media (max-width:800px) { #game { flex-direction:column } #board { height:50vh; flex:none } #side { width:100%; flex:1 }
+    #actions { width:120px; gap:4px } #actions button { font-size:13px; padding:5px 8px } #cardbar { max-width:calc(100% - 190px); left:auto; right:56px; transform:none } .ctile { width:80px; height:110px } .ctile .cicon { font-size:26px } #turnSplash { font-size:28px } }
 </style>
 </head>
 <body>
@@ -46,6 +69,7 @@
   <div id="entry" class="row"><input id="name" placeholder="Your name" maxlength="16" style="flex:1"><button id="joinBtn">Join</button></div>
   <div id="wait" class="hidden">
     <div id="waitPlayers"></div>
+    <label id="openWrap" class="row" style="margin-top:10px"><input type="checkbox" id="openHands"> Open hands — everyone sees all goods</label>
     <div class="row" style="margin-top:10px"><button id="startBtn">Start game</button><span id="waitMsg" class="muted"></span></div>
   </div>
   <div class="muted">2–4 players · first to 12 Renown wins</div>
@@ -53,20 +77,23 @@
 
 <div id="game" class="hidden">
   <div id="board"><canvas id="cv"></canvas><div id="banner" class="hidden"></div>
+    <div id="actions">
+      <button data-mode="route"><span>🛤️ Route</span><small data-cost="route"></small></button>
+      <button data-mode="outpost"><span>🏠 Outpost</span><small data-cost="outpost"></small></button>
+      <button data-mode="town"><span>🏰 Town</span><small data-cost="town"></small></button>
+      <button data-a="buy"><span>📜 Buy card</span><small data-cost="card"></small></button>
+      <button data-a="end" class="end"><span>⏭️ End turn</span></button>
+    </div>
+    <button id="rollBtn" data-a="roll" class="hidden">🎲 Roll dice</button>
+    <div id="diceShow" class="hidden"></div>
+    <div id="turnSplash" class="hidden"></div>
+    <div id="cardbar"></div>
     <div id="zoom"><button id="zIn" title="Zoom in" aria-label="Zoom in">+</button><button id="zOut" title="Zoom out" aria-label="Zoom out">−</button><button id="zReset" title="Fit board" aria-label="Fit board">⤢</button><button id="zMute" title="Sound on/off" aria-label="Sound on/off">🔊</button></div>
   </div>
   <div id="side">
     <section><h3>Captains</h3><div id="players"></div></section>
-    <section><h3>Turn</h3><div id="status" style="margin-bottom:6px"></div>
-      <div class="row">
-        <button data-a="roll">🎲 Roll</button>
-        <button data-mode="route">Route</button><button data-mode="outpost">Outpost</button><button data-mode="town">Town</button>
-        <button data-a="buy">Buy card</button><button data-a="end">End turn</button>
-      </div>
-      <div id="costs" class="muted" style="font-size:12px;margin-top:6px"></div>
-    </section>
+    <section><h3>Turn</h3><div id="status"></div></section>
     <section><h3>Your goods <span class="muted">(trade ratio below)</span></h3><div class="res" id="hand"></div></section>
-    <section><h3>Expedition cards</h3><div id="cards"></div></section>
     <section><h3>Bank / port</h3>
       <div class="row">Give <select id="bGive"></select> get <select id="bGet"></select><button id="bankBtn">Trade</button></div>
     </section>
@@ -94,7 +121,12 @@ const ICON = { timber: '🌲', clay: '🧱', wool: '🐑', grain: '🌾', metal:
 const TCOL = { forest: '#2e7d32', quarry: '#b8643a', meadow: '#9ccc65', farm: '#e9c046', mine: '#607d8b', desert: '#e3c27a' };
 const STEP = { outpost: 'place an outpost', route: 'place a shipping route', roll: 'roll the dice', discard: 'bandits! players are discarding',
   bandit: 'move the bandits (click a hex)', steal: 'choose whom to rob', act: 'trade, build, end turn' };
-const CARD = { captain: '⚓ Captain — move the bandits & steal', boon: '🎁 Resource Boon — take any 2 goods', renown: '⭐ Renown — +1 point (secret)' };
+const CARD = {
+  captain: { icon: '⚓', name: 'Captain', text: 'Move the bandits & steal' },
+  boon: { icon: '🎁', name: 'Resource Boon', text: 'Take any 2 goods' },
+  renown: { icon: '⭐', name: 'Renown', text: '+1 point (secret)' },
+};
+const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] }; // cells of a 3x3 die face
 
 const $ = id => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
@@ -117,7 +149,7 @@ socket.on('err', m => {
   if (m.startsWith('Session expired')) { ss.set('joined', ''); return location.reload(); } // server restarted: back to the name screen
   toast(m);
 });
-socket.on('state', s => { sounds(S, s); S = s; ss.set('joined', '1'); render(); });
+socket.on('state', s => { sounds(S, s); if (s.phase === 'main' && s.turn === s.me && (S?.turn !== s.me || S?.phase !== 'main')) splash('Your turn!'); S = s; ss.set('joined', '1'); render(); });
 
 // ---------- sound ----------
 // Files live in /sfx/<name>.mp3; a missing file is simply silent.
@@ -144,6 +176,7 @@ function sounds(old, s) {
   if ((s.longest !== null && s.longest !== old.longest) || (s.fleet !== null && s.fleet !== old.fleet)) setTimeout(() => sfx('award'), 400);
   const has = re => fresh.some(m => !m.startsWith('💬') && re.test(m)); // chat can't fake events
   if (has(/ rolled \d+$/)) {
+    showDice(s.dice);
     sfx('dice');
     if (handSize(s) > handSize(old)) setTimeout(() => sfx('gain'), 900); // after the dice settle
   }
@@ -188,7 +221,8 @@ addEventListener('keydown', startAmbience);
 $('name').value = ss.get('name') || '';
 $('joinBtn').onclick = () => { ss.set('name', $('name').value); socket.emit('join', { name: $('name').value, pid }); };
 $('name').onkeydown = e => { if (e.key === 'Enter') $('joinBtn').click(); }; // braces: returning false would cancel every keypress
-$('startBtn').onclick = () => socket.emit('start');
+const start = () => socket.emit('start', { open: $('openHands').checked });
+$('startBtn').onclick = start;
 
 // ---------- static controls ----------
 for (const id of ['bGive', 'bGet']) $(id).append(...RES.map(k => el('option', { value: k, textContent: ICON[k] + ' ' + k })));
@@ -217,6 +251,7 @@ function render() {
   if (!inGame) {
     $('waitPlayers').replaceChildren(...S.players.map((p, i) => el('div', {}, dot(p.color), p.name + (i === S.me ? ' (you)' : ''))));
     $('startBtn').classList.toggle('hidden', !S.isHost);
+    $('openWrap').classList.toggle('hidden', !S.isHost);
     $('startBtn').disabled = S.players.length < 2;
     $('waitMsg').textContent = S.isHost ? (S.players.length < 2 ? 'Waiting for players…' : '') : 'Waiting for the host to start…';
     return;
@@ -231,10 +266,11 @@ function renderSide() {
   const my = S.my, live = S.phase === 'main' && mine(), acting = live && S.step === 'act';
   const can = kind => RES.every(k => my.res[k] >= (S.cost[kind][k] || 0));
 
-  $('players').replaceChildren(...S.players.map((p, i) => el('div', { className: 'pl' + (i === S.turn ? ' cur' : '') },
+  $('players').replaceChildren(...S.players.flatMap((p, i) => [el('div', { className: 'pl' + (i === S.turn ? ' cur' : '') },
     el('span', {}, dot(p.color), p.name + (i === S.me ? ' (you)' : '') + (p.connected ? '' : ' ⚠️')),
     el('span', { title: 'Renown · goods in hand · expedition cards · route length · captains played' },
-      `${p.points}★  🎴${p.hand} 📜${p.cards} 🛤${p.route}${S.longest === i ? '🏅' : ''} ⚓${p.captains}${S.fleet === i ? '🏅' : ''}`))));
+      `${p.points}★  🎴${p.hand} 📜${p.cards} 🛤${p.route}${S.longest === i ? '🏅' : ''} ⚓${p.captains}${S.fleet === i ? '🏅' : ''}`)),
+    p.res && i !== S.me ? el('div', { className: 'goods muted' }, fmt(p.res)) : '']));
 
   const cur = S.players[S.turn], d = S.dice;
   $('status').textContent = S.phase === 'over' ? `🏆 ${S.players[S.winner].name} wins!`
@@ -244,22 +280,29 @@ function renderSide() {
 
   const enabled = { roll: live && S.step === 'roll', buy: acting && can('card') && S.deckLeft > 0, end: acting };
   document.querySelectorAll('[data-a]').forEach(b => { b.disabled = !enabled[b.dataset.a]; });
+  $('rollBtn').classList.toggle('hidden', !enabled.roll);
   document.querySelectorAll('[data-mode]').forEach(b => {
     const k = b.dataset.mode;
     b.disabled = !(acting && can(k) && my.left[k] > 0 && S.legal?.[k + 's']?.length);
     if (b.disabled && mode === k) mode = null;
     b.classList.toggle('on', mode === k);
-    b.title = `${my.left[k]} left`;
   });
-  $('costs').textContent = Object.entries(S.cost).map(([k, c]) => `${k} ${fmt(c)}`).join(' · ') + ` · ${S.deckLeft} cards in deck`;
+  const left = { ...my.left, card: S.deckLeft };
+  document.querySelectorAll('[data-cost]').forEach(c => { const k = c.dataset.cost; c.textContent = `${fmt(S.cost[k])} · ${left[k]} left`; });
 
   $('hand').replaceChildren(...RES.map(k => el('div', { title: k }, el('b', {}, `${ICON[k]} ${my.res[k]}`), el('small', { className: 'muted' }, my.ratios[k] + ':1'))));
 
-  const playable = live && (S.step === 'roll' || S.step === 'act') && !my.cardPlayed;
-  const rows = my.cards.map(c => el('div', { className: 'row' }, CARD[c],
-    c === 'renown' ? '' : btn('Play', () => { if (c === 'boon') { boon = true; renderModal(); } else act('play', { card: c }); }, !playable)));
-  rows.push(...my.fresh.map(c => el('div', { className: 'muted' }, CARD[c] + (c === 'renown' ? '' : ' (playable next turn)'))));
-  $('cards').replaceChildren(...(rows.length ? rows : [el('div', { className: 'muted' }, 'None yet.')]));
+  // Card hand along the bottom of the board; click a card to play it (only after rolling, one per turn).
+  const playable = acting && !my.cardPlayed;
+  const cardTile = (c, fresh) => {
+    const { icon, name, text } = CARD[c], kept = c === 'renown';
+    const b = el('button', { className: 'ctile' + (kept ? ' kept' : ''), disabled: kept || fresh || !playable, title: text,
+      onclick: () => { if (c === 'boon') { boon = true; renderModal(); } else act('play', { card: c }); } },
+      el('div', { className: 'cicon' }, icon), el('b', {}, name), el('small', {}, fresh && !kept ? 'Playable next turn' : text));
+    b.dataset.card = c;
+    return b;
+  };
+  $('cardbar').replaceChildren(...my.cards.map(c => cardTile(c, false)), ...my.fresh.map(c => cardTile(c, true)));
 
   const g = $('bGive').value, n = my.ratios[g];
   $('bankBtn').textContent = `Trade ${n}:1`;
@@ -284,6 +327,19 @@ function renderSide() {
   L.scrollTop = L.scrollHeight;
 }
 
+// Big centre overlays: re-adding the element restarts its CSS animation.
+function flash(box, ms) {
+  box.classList.add('hidden'); void box.offsetWidth; box.classList.remove('hidden');
+  clearTimeout(box.t); box.t = setTimeout(() => box.classList.add('hidden'), ms);
+}
+function showDice(d) {
+  if (!d) return;
+  const die = n => el('div', { className: 'die' }, ...Array.from({ length: 9 }, (_, k) => el('i', { className: PIPS[n].includes(k) ? 'pip' : '' })));
+  $('diceShow').replaceChildren(die(d[0]), die(d[1]), el('b', {}, '= ' + (d[0] + d[1])));
+  flash($('diceShow'), 2500);
+}
+function splash(text) { $('turnSplash').textContent = text; flash($('turnSplash'), 2000); }
+
 function renderModal() {
   const key = S.phase === 'over' ? 'over' : S.discard ? 'discard' + S.discard : S.victims?.length ? 'steal' + S.victims : boon ? 'boon' : '';
   if (key === modalKey) return;
@@ -295,7 +351,7 @@ function renderModal() {
     const ranked = S.players.map((p, i) => ({ ...p, i })).sort((a, b) => b.points - a.points);
     m.append(el('h2', {}, `🏆 ${S.players[S.winner].name} wins!`),
       ...ranked.map(p => el('div', {}, dot(p.color), `${p.name} — ${p.points} Renown`)),
-      el('div', { className: 'row' }, btn('View board', () => $('modal').classList.add('hidden')), S.isHost ? btn('New game', () => socket.emit('start')) : ''));
+      el('div', { className: 'row' }, btn('View board', () => $('modal').classList.add('hidden')), S.isHost ? btn('New game', start) : ''));
   } else if (key.startsWith('discard')) {
     const ins = RES.map(k => el('input', { type: 'number', min: 0, max: S.my.res[k], value: 0, className: 'qty' }));
     m.append(el('h2', {}, `🗡️ Bandits! Discard ${S.discard} goods`),
@@ -507,7 +563,14 @@ function draw() {
       text(h.num, h.x, h.y - .04, .24, hot ? '#c62828' : '#222');
       text('•'.repeat(6 - Math.abs(7 - h.num)), h.x, h.y + .17, .12, hot ? '#c62828' : '#222');
     }
-    if (i === B.bandit) { circle(h.x, h.y - .55, .2, '#111', '#000'); text('🗡️', h.x, h.y - .55, .22, '#fff'); }
+    if (i !== B.bandit) return;
+    const img = PIECE.bandits;
+    if (ready(img)) { // /img/bandits.png: figure stands just above the number token
+      const w = .8 * s, ih = w * img.naturalHeight / img.naturalWidth, [x, y] = P(h.x, h.y - .2);
+      ctx.save(); ctx.shadowColor = '#000a'; ctx.shadowBlur = .12 * s; ctx.shadowOffsetY = .05 * s;
+      ctx.drawImage(img, x - w / 2, y - ih, w, ih);
+      ctx.restore();
+    } else { circle(h.x, h.y - .55, .2, '#111', '#000'); text('🗡️', h.x, h.y - .55, .22, '#fff'); }
   });
 
   // Roads: each player's whole network is stroked as ONE path (outline, curb, cobbles), so bends are
@@ -561,7 +624,7 @@ function draw() {
 }
 
 // Player pieces: white art from cut_tile.py, tinted per player (multiply keeps the painted shading).
-const PIECE = Object.fromEntries(['outpost', 'town', 'route'].map(n => [n, Object.assign(new Image(), { src: `/img/${n}.png`, onload: () => draw() })]));
+const PIECE = Object.fromEntries(['outpost', 'town', 'route', 'bandits'].map(n => [n, Object.assign(new Image(), { src: `/img/${n}.png`, onload: () => draw() })]));
 const ready = img => img.complete && img.naturalWidth;
 const tinted = new Map();
 function tint(img, color) {
@@ -663,7 +726,7 @@ requestAnimationFrame(frame);
 const PREVIEW = new URLSearchParams(location.search).has('preview');
 async function preview() {
   S = { board: await (await fetch('/board')).json(), players: [], phase: 'preview' };
-  $('lobby').classList.add('hidden'); $('side').classList.add('hidden'); $('game').classList.remove('hidden');
+  $('lobby').classList.add('hidden'); $('side').classList.add('hidden'); $('actions').classList.add('hidden'); $('game').classList.remove('hidden');
   $('banner').textContent = 'Preview — click for a new board'; $('banner').classList.remove('hidden');
   fit();
 }

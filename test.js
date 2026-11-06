@@ -32,7 +32,8 @@ for (let game = 0; game < 20; game++) {
     }
     if (R.step === 'bandit') { assert(ok(i, 'bandit', { hex: pick(B.hexes.map((_, k) => k).filter(k => k !== B.bandit)) })); continue; }
     if (R.step === 'steal') { assert(ok(i, 'steal', { target: pick(R.victims) })); continue; }
-    if (R.step === 'roll') { if (!(p.cards.includes('captain') && Math.random() < .5 && ok(i, 'play', { card: 'captain' }))) assert(ok(i, 'roll')); continue; }
+    if (R.step === 'roll') { assert(!ok(i, 'play', { card: 'captain' }), 'no cards before rolling'); assert(ok(i, 'roll')); continue; }
+    if (p.cards.includes('captain') && Math.random() < .5 && ok(i, 'play', { card: 'captain' })) continue;
 
     if (Math.random() < .1) {
       const give = RES.find(k => p.res[k] > 1), want = RES.find(k => p.res[k] === 0);
