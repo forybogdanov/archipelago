@@ -1,4 +1,4 @@
-# Usage: python cut_checker.py <image> <out.png>   e.g. python cut_checker.py bandits.jpg img/bandits.png
+# Usage: python cut_checker.py <image> <out.png>   e.g. python cut_checker.py robber.jpg img/robber.png
 # Remove a baked-in "transparency" checkerboard (40x40 squares, ~254 / ~201 grey) from a generated sprite.
 # A pixel is background if it matches the checker colour expected at its position; grey art rarely does.
 import sys
