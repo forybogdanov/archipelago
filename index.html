@@ -35,9 +35,51 @@
   .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; border:1px solid #000 }
   #log { height:150px; overflow-y:auto; font-size:12px; color:var(--mut); margin-bottom:6px }
   #modal { position:fixed; inset:0; background:#000a; display:flex; align-items:center; justify-content:center; z-index:5 }
-  #toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:#b23b3b; padding:8px 14px; border-radius:8px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:6 }
+  #toast { position:fixed; top:56px; left:50%; transform:translateX(-50%); background:#b23b3b; padding:8px 14px; border-radius:8px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:6 }
   #toast.show { opacity:1 }
-  @media (max-width:800px) { #game { flex-direction:column } #board { height:50vh; flex:none } #side { width:100%; flex:1 } }
+  #actions { position:absolute; left:12px; top:50%; transform:translateY(-50%); display:grid; gap:8px; width:170px }
+  #actions button { display:grid; text-align:left; padding:10px 12px; font-size:16px; font-weight:600; background:#16263bee; border:2px solid #3d5a80; box-shadow:0 2px 8px #0008 }
+  #actions button:disabled { opacity:.65 }
+  #actions button small { font-size:12px; font-weight:400; color:var(--mut) }
+  #actions button.on { background:var(--acc); color:#111; border-color:#fff }
+  #actions button.on small { color:#333 }
+  #actions button.end:not(:disabled) { background:#2e7d32; border-color:#66bb6a }
+  #rollBtn { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-size:26px; font-weight:700; padding:18px 34px; background:var(--acc); color:#111; border:3px solid #fff; border-radius:14px; box-shadow:0 6px 24px #000a }
+  #diceShow { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:flex; gap:14px; align-items:center; background:#000a; padding:16px 22px; border-radius:16px; pointer-events:none; animation:pop .45s ease-out; font-size:36px }
+  @keyframes pop { from { transform:translate(-50%,-50%) scale(.3) rotate(-25deg); opacity:0 } }
+  .die { width:72px; height:72px; padding:9px; background:#fbf7ec; border-radius:14px; display:grid; grid-template:repeat(3,1fr)/repeat(3,1fr); box-shadow:inset 0 -4px 0 #0003, 0 4px 10px #0008 }
+  .die .pip { background:#222; border-radius:50%; margin:3px }
+  #turnSplash { position:absolute; left:50%; top:30%; font-size:44px; font-weight:800; color:var(--acc); text-shadow:0 3px 12px #000; white-space:nowrap; pointer-events:none; animation:slide 2s ease-in-out forwards }
+  @keyframes slide { 0% { transform:translate(-150%,-50%); opacity:0 } 20%, 80% { transform:translate(-50%,-50%); opacity:1 } 100% { transform:translate(50%,-50%); opacity:0 } }
+  #cardbar { position:absolute; left:50%; bottom:10px; transform:translateX(-50%); display:flex; gap:8px; max-width:calc(100% - 420px); overflow-x:auto; padding-top:10px }
+  /* per-card art later: .ctile[data-card=knight] { background-image:url(/img/knight.png) } */
+  .ctile { flex:none; width:110px; height:150px; display:grid; grid-template-rows:auto auto 1fr; justify-items:center; gap:4px; padding:8px; background:#f3e5c4 center/cover no-repeat; color:#3b2a12; border:2px solid #7a5c2e; border-radius:10px; box-shadow:0 4px 12px #000a; text-align:center; transition:transform .15s }
+  .ctile:not(:disabled):hover { transform:translateY(-8px); border-color:var(--acc) }
+  .ctile:disabled.kept { opacity:1 }
+  .ctile .cicon { font-size:40px }
+  .ctile small { font-size:11px }
+  #duel { position:fixed; inset:0; z-index:7; background:#000; cursor:crosshair; user-select:none; font-weight:700; text-shadow:0 1px 3px #000 }
+  #duel canvas { display:block; width:100%; height:100% }
+  #duel > div { position:absolute; pointer-events:none }
+  #duel .cross { left:50%; top:50%; width:22px; height:22px; margin:-11px; background:linear-gradient(#4f6,#4f6) left center/7px 2px no-repeat, linear-gradient(#4f6,#4f6) right center/7px 2px no-repeat, linear-gradient(#4f6,#4f6) center top/2px 7px no-repeat, linear-gradient(#4f6,#4f6) center bottom/2px 7px no-repeat }
+  #duel .scope { inset:0; display:none; background:linear-gradient(#000,#000) center/1px 100% no-repeat, linear-gradient(#000,#000) center/100% 1px no-repeat, radial-gradient(circle, transparent 44vh, #000 44.5vh) }
+  #duel .hurt { inset:0; background:radial-gradient(transparent 40%, #d00a); opacity:0; transition:opacity .4s }
+  #duel .hurt.on { opacity:1; transition:none }
+  #duel .top { top:12px; left:50%; transform:translateX(-50%); font-size:20px; background:#0008; padding:6px 16px; border-radius:8px; white-space:pre }
+  #duel .hp { left:24px; bottom:24px; font-size:34px }
+  #duel .hp.low { color:#ff5252 }
+  #duel .ammo { right:24px; bottom:24px; font-size:26px; text-align:right; white-space:pre }
+  #duel .feed { top:12px; right:16px; font-size:14px; text-align:right }
+  #duel .feed div { background:#0008; border:1px solid #c33; padding:3px 8px; border-radius:4px; margin-bottom:4px; white-space:pre }
+  #duel .msg { top:22%; left:50%; transform:translateX(-50%); font-size:34px; white-space:nowrap }
+  #duel .pick { display:none; top:31%; left:50%; transform:translateX(-50%); font-size:20px; background:#0008; padding:8px 18px; border-radius:8px; white-space:pre }
+  #duel .pick span { opacity:.55 }
+  #duel .pick span.on { opacity:1; color:var(--acc) }
+  #duel .hint { bottom:4px; left:50%; transform:translateX(-50%); font-size:11px; font-weight:400; opacity:.75; white-space:nowrap }
+  #duel #turnSplash { z-index:1 }
+  .reslist { font-size:12px; padding:0 6px 4px 22px }
+  @media (max-width:800px) { #game { flex-direction:column } #board { height:50vh; flex:none } #side { width:100%; flex:1 }
+    #actions { width:120px; gap:4px } #actions button { font-size:13px; padding:5px 8px } #cardbar { max-width:calc(100% - 190px); left:auto; right:56px; transform:none } .ctile { width:80px; height:110px } .ctile .cicon { font-size:26px } #turnSplash { font-size:28px } }
 </style>
 </head>
 <body>
@@ -46,27 +88,31 @@
   <div id="entry" class="row"><input id="name" placeholder="Your name" maxlength="16" style="flex:1"><button id="joinBtn">Join</button></div>
   <div id="wait" class="hidden">
     <div id="waitPlayers"></div>
+    <label id="openWrap" class="row" style="margin-top:10px"><input type="checkbox" id="openHands"> Open hands — everyone sees all resources</label>
     <div class="row" style="margin-top:10px"><button id="startBtn">Start game</button><span id="waitMsg" class="muted"></span></div>
   </div>
-  <div class="muted">2–4 players · first to 12 Renown wins</div>
+  <div class="muted">2–4 players · first to 12 Victory Points wins</div>
 </div></div>
 
 <div id="game" class="hidden">
   <div id="board"><canvas id="cv"></canvas><div id="banner" class="hidden"></div>
+    <div id="actions">
+      <button data-mode="road"><span>🛣️ Road</span><small data-cost="road"></small></button>
+      <button data-mode="settlement"><span>🏠 Settlement</span><small data-cost="settlement"></small></button>
+      <button data-mode="city"><span>🏙️ City</span><small data-cost="city"></small></button>
+      <button data-a="buy"><span>📜 Development card</span><small data-cost="card"></small></button>
+      <button data-a="end" class="end"><span>⏭️ End turn</span></button>
+    </div>
+    <button id="rollBtn" data-a="roll" class="hidden">🎲 Roll dice</button>
+    <div id="diceShow" class="hidden"></div>
+    <div id="turnSplash" class="hidden"></div>
+    <div id="cardbar"></div>
     <div id="zoom"><button id="zIn" title="Zoom in" aria-label="Zoom in">+</button><button id="zOut" title="Zoom out" aria-label="Zoom out">−</button><button id="zReset" title="Fit board" aria-label="Fit board">⤢</button><button id="zMute" title="Sound on/off" aria-label="Sound on/off">🔊</button></div>
   </div>
   <div id="side">
-    <section><h3>Captains</h3><div id="players"></div></section>
-    <section><h3>Turn</h3><div id="status" style="margin-bottom:6px"></div>
-      <div class="row">
-        <button data-a="roll">🎲 Roll</button>
-        <button data-mode="route">Route</button><button data-mode="outpost">Outpost</button><button data-mode="town">Town</button>
-        <button data-a="buy">Buy card</button><button data-a="end">End turn</button>
-      </div>
-      <div id="costs" class="muted" style="font-size:12px;margin-top:6px"></div>
-    </section>
-    <section><h3>Your goods <span class="muted">(trade ratio below)</span></h3><div class="res" id="hand"></div></section>
-    <section><h3>Expedition cards</h3><div id="cards"></div></section>
+    <section><h3>Players</h3><div id="players"></div></section>
+    <section><h3>Turn</h3><div id="status"></div></section>
+    <section><h3>Your resources <span class="muted">(trade ratio below)</span></h3><div class="res" id="hand"></div></section>
     <section><h3>Bank / port</h3>
       <div class="row">Give <select id="bGive"></select> get <select id="bGet"></select><button id="bankBtn">Trade</button></div>
     </section>
@@ -88,13 +134,21 @@
 <div id="toast"></div>
 
 <script src="/socket.io/socket.io.js"></script>
+<script src="/duel.js"></script>
 <script>
-const RES = ['timber', 'clay', 'wool', 'grain', 'metal'];
-const ICON = { timber: '🌲', clay: '🧱', wool: '🐑', grain: '🌾', metal: '⛏️' };
-const TCOL = { forest: '#2e7d32', quarry: '#b8643a', meadow: '#9ccc65', farm: '#e9c046', mine: '#607d8b', desert: '#e3c27a' };
-const STEP = { outpost: 'place an outpost', route: 'place a shipping route', roll: 'roll the dice', discard: 'bandits! players are discarding',
-  bandit: 'move the bandits (click a hex)', steal: 'choose whom to rob', act: 'trade, build, end turn' };
-const CARD = { captain: '⚓ Captain — move the bandits & steal', boon: '🎁 Resource Boon — take any 2 goods', renown: '⭐ Renown — +1 point (secret)' };
+const RES = ['wood', 'brick', 'sheep', 'wheat', 'ore'];
+const ICON = { wood: '🌲', brick: '🧱', sheep: '🐑', wheat: '🌾', ore: '⛏️' };
+const TCOL = { forest: '#2e7d32', hills: '#b8643a', pasture: '#9ccc65', fields: '#e9c046', mountains: '#607d8b', desert: '#e3c27a' };
+const PLURAL = { road: 'roads', settlement: 'settlements', city: 'cities' };
+const STEP = { settlement: 'place a settlement', road: 'place a road', roll: 'roll the dice', discard: 'robber! players are discarding',
+  robber: 'move the robber (click a hex)', steal: 'choose whom to rob', act: 'trade, build, end turn', duel: 'duel in progress' };
+const CARD = {
+  knight: { icon: '🛡️', name: 'Knight', text: 'Move the robber & steal' },
+  plenty: { icon: '🎁', name: 'Year of Plenty', text: 'Take any 2 resources' },
+  victory: { icon: '⭐', name: 'Victory Point', text: '+1 point (secret)' },
+  challenge: { icon: '⚔️', name: 'Challenge', text: 'Duel a player: win = all their resources' },
+};
+const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] }; // cells of a 3x3 die face
 
 const $ = id => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
@@ -106,7 +160,7 @@ const ss = { get(k) { try { return sessionStorage.getItem(k); } catch { return n
 const pid = ss.get('pid') || (() => { const id = Math.random().toString(36).slice(2) + Date.now().toString(36); ss.set('pid', id); return id; })();
 
 const socket = io({ transports: ['websocket'] }); // no URL: binds to whatever host/protocol served the page (localhost, LAN, ngrok)
-let S = null, mode = null, boon = false, modalKey = '';
+let S = null, mode = null, plenty = false, challenge = false, modalKey = '';
 const act = (type, a = {}) => socket.emit('act', { type, ...a });
 const mine = () => S && S.turn === S.me;
 
@@ -117,7 +171,7 @@ socket.on('err', m => {
   if (m.startsWith('Session expired')) { ss.set('joined', ''); return location.reload(); } // server restarted: back to the name screen
   toast(m);
 });
-socket.on('state', s => { sounds(S, s); S = s; ss.set('joined', '1'); render(); });
+socket.on('state', s => { sounds(S, s); duelResult(S, s); if (s.phase === 'main' && s.turn === s.me && (S?.turn !== s.me || S?.phase !== 'main')) splash('Your turn!'); S = s; ss.set('joined', '1'); render(); });
 
 // ---------- sound ----------
 // Files live in /sfx/<name>.mp3; a missing file is simply silent.
@@ -140,17 +194,19 @@ function sounds(old, s) {
   if (s.phase === 'lobby') { if (s.players.length > old.players.length) sfx('join'); return; }
   if (old.phase === 'lobby') return;
   if (s.phase === 'over' && old.phase !== 'over') return sfx('win');
-  // longest route / largest fleet changed hands
-  if ((s.longest !== null && s.longest !== old.longest) || (s.fleet !== null && s.fleet !== old.fleet)) setTimeout(() => sfx('award'), 400);
+  // longest road / largest army changed hands
+  if ((s.longest !== null && s.longest !== old.longest) || (s.army !== null && s.army !== old.army)) setTimeout(() => sfx('award'), 400);
   const has = re => fresh.some(m => !m.startsWith('💬') && re.test(m)); // chat can't fake events
   if (has(/ rolled \d+$/)) {
+    showDice(s.dice);
     sfx('dice');
     if (handSize(s) > handSize(old)) setTimeout(() => sfx('gain'), 900); // after the dice settle
   }
-  if (has(/Bandits raid/)) setTimeout(() => sfx('bandits'), 700);
-  if (has(/ (built|placed) an? (route|outpost|town)$/)) sfx('build');
-  if (has(/ bought an expedition card$/)) sfx('buy');
-  if (has(/ played (a Captain|a Resource Boon)$/)) sfx('card');
+  if (has(/ robber raids/)) setTimeout(() => sfx('robber'), 700);
+  if (has(/ (built|placed) a (road|settlement|city)$/)) sfx('build');
+  if (has(/ bought a development card$/)) sfx('buy');
+  if (has(/ traded with /)) for (const side in qty) qty[side].forEach(q => q.value = 0); // fresh form for the next player trade
+  if (has(/ played (a Knight|a Year of Plenty)$/)) sfx('card');
   // trade offers aren't logged: a new offer from someone else shows up as a changed s.trade
   const offer = t => t && JSON.stringify([t.from, t.give, t.want]);
   if (s.trade && s.trade.from !== s.me && offer(s.trade) !== offer(old.trade)) sfx('trade');
@@ -188,11 +244,12 @@ addEventListener('keydown', startAmbience);
 $('name').value = ss.get('name') || '';
 $('joinBtn').onclick = () => { ss.set('name', $('name').value); socket.emit('join', { name: $('name').value, pid }); };
 $('name').onkeydown = e => { if (e.key === 'Enter') $('joinBtn').click(); }; // braces: returning false would cancel every keypress
-$('startBtn').onclick = () => socket.emit('start');
+const start = () => socket.emit('start', { open: $('openHands').checked });
+$('startBtn').onclick = start;
 
 // ---------- static controls ----------
 for (const id of ['bGive', 'bGet']) $(id).append(...RES.map(k => el('option', { value: k, textContent: ICON[k] + ' ' + k })));
-$('bGet').value = 'clay';
+$('bGet').value = 'brick';
 $('bGive').onchange = $('bGet').onchange = () => renderSide();
 $('bankBtn').onclick = () => act('bank', { give: $('bGive').value, get: $('bGet').value });
 const qty = {};
@@ -217,6 +274,7 @@ function render() {
   if (!inGame) {
     $('waitPlayers').replaceChildren(...S.players.map((p, i) => el('div', {}, dot(p.color), p.name + (i === S.me ? ' (you)' : ''))));
     $('startBtn').classList.toggle('hidden', !S.isHost);
+    $('openWrap').classList.toggle('hidden', !S.isHost);
     $('startBtn').disabled = S.players.length < 2;
     $('waitMsg').textContent = S.isHost ? (S.players.length < 2 ? 'Waiting for players…' : '') : 'Waiting for the host to start…';
     return;
@@ -224,6 +282,7 @@ function render() {
   renderSide();
   fit();
   renderModal();
+  duelSync();
 }
 
 function renderSide() {
@@ -231,35 +290,44 @@ function renderSide() {
   const my = S.my, live = S.phase === 'main' && mine(), acting = live && S.step === 'act';
   const can = kind => RES.every(k => my.res[k] >= (S.cost[kind][k] || 0));
 
-  $('players').replaceChildren(...S.players.map((p, i) => el('div', { className: 'pl' + (i === S.turn ? ' cur' : '') },
+  $('players').replaceChildren(...S.players.flatMap((p, i) => [el('div', { className: 'pl' + (i === S.turn ? ' cur' : '') },
     el('span', {}, dot(p.color), p.name + (i === S.me ? ' (you)' : '') + (p.connected ? '' : ' ⚠️')),
-    el('span', { title: 'Renown · goods in hand · expedition cards · route length · captains played' },
-      `${p.points}★  🎴${p.hand} 📜${p.cards} 🛤${p.route}${S.longest === i ? '🏅' : ''} ⚓${p.captains}${S.fleet === i ? '🏅' : ''}`))));
+    el('span', { title: 'Victory points · resources in hand · development cards · road length · knights played' },
+      `${p.points}★  🎴${p.hand} 📜${p.cards} 🛣️${p.road}${S.longest === i ? '🏅' : ''} 🛡️${p.knights}${S.army === i ? '🏅' : ''}`)),
+    p.res && i !== S.me ? el('div', { className: 'reslist muted' }, fmt(p.res)) : '']));
 
   const cur = S.players[S.turn], d = S.dice;
   $('status').textContent = S.phase === 'over' ? `🏆 ${S.players[S.winner].name} wins!`
     : `${mine() ? 'Your' : cur.name + "'s"} turn — ${STEP[S.step]}` + (d ? `   (🎲 ${d[0]}+${d[1]}=${d[0] + d[1]})` : '');
-  $('banner').textContent = mine() && S.phase !== 'over' ? 'Your turn — ' + STEP[S.step] : '';
+  const D = S.duel;
+  $('banner').textContent = D ? `⚔️ Duel: ${S.players[D.a].name} ${D.score[D.a]} : ${D.score[D.b]} ${S.players[D.b].name} (first to ${D.wins})` : mine() && S.phase !== 'over' ? 'Your turn — ' + STEP[S.step] : '';
   $('banner').classList.toggle('hidden', !$('banner').textContent);
 
   const enabled = { roll: live && S.step === 'roll', buy: acting && can('card') && S.deckLeft > 0, end: acting };
   document.querySelectorAll('[data-a]').forEach(b => { b.disabled = !enabled[b.dataset.a]; });
+  $('rollBtn').classList.toggle('hidden', !enabled.roll);
   document.querySelectorAll('[data-mode]').forEach(b => {
     const k = b.dataset.mode;
-    b.disabled = !(acting && can(k) && my.left[k] > 0 && S.legal?.[k + 's']?.length);
+    b.disabled = !(acting && can(k) && my.left[k] > 0 && S.legal?.[PLURAL[k]]?.length);
     if (b.disabled && mode === k) mode = null;
     b.classList.toggle('on', mode === k);
-    b.title = `${my.left[k]} left`;
   });
-  $('costs').textContent = Object.entries(S.cost).map(([k, c]) => `${k} ${fmt(c)}`).join(' · ') + ` · ${S.deckLeft} cards in deck`;
+  const left = { ...my.left, card: S.deckLeft };
+  document.querySelectorAll('[data-cost]').forEach(c => { const k = c.dataset.cost; c.textContent = `${fmt(S.cost[k])} · ${left[k]} left`; });
 
   $('hand').replaceChildren(...RES.map(k => el('div', { title: k }, el('b', {}, `${ICON[k]} ${my.res[k]}`), el('small', { className: 'muted' }, my.ratios[k] + ':1'))));
 
-  const playable = live && (S.step === 'roll' || S.step === 'act') && !my.cardPlayed;
-  const rows = my.cards.map(c => el('div', { className: 'row' }, CARD[c],
-    c === 'renown' ? '' : btn('Play', () => { if (c === 'boon') { boon = true; renderModal(); } else act('play', { card: c }); }, !playable)));
-  rows.push(...my.fresh.map(c => el('div', { className: 'muted' }, CARD[c] + (c === 'renown' ? '' : ' (playable next turn)'))));
-  $('cards').replaceChildren(...(rows.length ? rows : [el('div', { className: 'muted' }, 'None yet.')]));
+  // Card hand along the bottom of the board; click a card to play it (only after rolling, one per turn).
+  const playable = acting && !my.cardPlayed;
+  const cardTile = (c, fresh) => {
+    const { icon, name, text } = CARD[c], kept = c === 'victory';
+    const b = el('button', { className: 'ctile' + (kept ? ' kept' : ''), disabled: kept || fresh || !playable, title: text,
+      onclick: () => { if (c === 'plenty' || c === 'challenge') { plenty = c === 'plenty'; challenge = c === 'challenge'; renderModal(); } else act('play', { card: c }); } },
+      el('div', { className: 'cicon' }, icon), el('b', {}, name), el('small', {}, fresh && !kept ? 'Playable next turn' : text));
+    b.dataset.card = c;
+    return b;
+  };
+  $('cardbar').replaceChildren(...my.cards.map(c => cardTile(c, false)), ...my.fresh.map(c => cardTile(c, true)));
 
   const g = $('bGive').value, n = my.ratios[g];
   $('bankBtn').textContent = `Trade ${n}:1`;
@@ -284,8 +352,21 @@ function renderSide() {
   L.scrollTop = L.scrollHeight;
 }
 
+// Big centre overlays: re-adding the element restarts its CSS animation.
+function flash(box, ms) {
+  box.classList.add('hidden'); void box.offsetWidth; box.classList.remove('hidden');
+  clearTimeout(box.t); box.t = setTimeout(() => box.classList.add('hidden'), ms);
+}
+function showDice(d) {
+  if (!d) return;
+  const die = n => el('div', { className: 'die' }, ...Array.from({ length: 9 }, (_, k) => el('i', { className: PIPS[n].includes(k) ? 'pip' : '' })));
+  $('diceShow').replaceChildren(die(d[0]), die(d[1]), el('b', {}, '= ' + (d[0] + d[1])));
+  flash($('diceShow'), 2500);
+}
+function splash(text) { $('turnSplash').textContent = text; flash($('turnSplash'), 2000); }
+
 function renderModal() {
-  const key = S.phase === 'over' ? 'over' : S.discard ? 'discard' + S.discard : S.victims?.length ? 'steal' + S.victims : boon ? 'boon' : '';
+  const key = S.phase === 'over' ? 'over' : S.discard ? 'discard' + S.discard : S.victims?.length ? 'steal' + S.victims : plenty ? 'plenty' : challenge ? 'challenge' : '';
   if (key === modalKey) return;
   modalKey = key;
   const m = $('modalBody');
@@ -294,22 +375,388 @@ function renderModal() {
   if (key === 'over') {
     const ranked = S.players.map((p, i) => ({ ...p, i })).sort((a, b) => b.points - a.points);
     m.append(el('h2', {}, `🏆 ${S.players[S.winner].name} wins!`),
-      ...ranked.map(p => el('div', {}, dot(p.color), `${p.name} — ${p.points} Renown`)),
-      el('div', { className: 'row' }, btn('View board', () => $('modal').classList.add('hidden')), S.isHost ? btn('New game', () => socket.emit('start')) : ''));
+      ...ranked.map(p => el('div', {}, dot(p.color), `${p.name} — ${p.points} Victory Points`)),
+      el('div', { className: 'row' }, btn('View board', () => $('modal').classList.add('hidden')), S.isHost ? btn('New game', start) : ''));
   } else if (key.startsWith('discard')) {
     const ins = RES.map(k => el('input', { type: 'number', min: 0, max: S.my.res[k], value: 0, className: 'qty' }));
-    m.append(el('h2', {}, `🗡️ Bandits! Discard ${S.discard} goods`),
+    m.append(el('h2', {}, `🗡️ Robber! Discard ${S.discard} resources`),
       el('div', { className: 'res' }, ...RES.map((k, i) => el('div', {}, `${ICON[k]} ${S.my.res[k]}`, ins[i]))),
       btn('Discard', () => act('discard', { res: Object.fromEntries(RES.map((k, i) => [k, +ins[i].value || 0])) })));
   } else if (key.startsWith('steal')) {
     m.append(el('h2', {}, 'Rob whom?'), el('div', { className: 'row' }, ...S.victims.map(j => btn(S.players[j].name, () => act('steal', { target: j })))));
-  } else if (key === 'boon') {
+  } else if (key === 'plenty') {
     const sels = [0, 1].map(() => el('select', {}, ...RES.map(k => el('option', { value: k, textContent: ICON[k] + ' ' + k }))));
-    const close = () => { boon = false; renderModal(); };
-    m.append(el('h2', {}, '🎁 Resource Boon'), el('div', { className: 'row' }, ...sels),
-      el('div', { className: 'row' }, btn('Take', () => { act('play', { card: 'boon', res: sels.map(s => s.value) }); close(); }), btn('Cancel', close)));
+    const close = () => { plenty = false; renderModal(); };
+    m.append(el('h2', {}, '🎁 Year of Plenty'), el('div', { className: 'row' }, ...sels),
+      el('div', { className: 'row' }, btn('Take', () => { act('play', { card: 'plenty', res: sels.map(s => s.value) }); close(); }), btn('Cancel', close)));
+  } else if (key === 'challenge') {
+    const close = () => { challenge = false; renderModal(); };
+    m.append(el('h2', {}, '⚔️ Challenge whom?'), el('div', { className: 'muted' }, 'First-person shootout, first to 3 rounds. Win: take all their resources. Lose: nothing happens.'),
+      el('div', { className: 'row' }, ...S.players.flatMap((p, j) => j === S.me ? [] : [btn(`${p.name} (${p.hand} resources)`, () => { act('play', { card: 'challenge', target: j }); close(); })]), btn('Cancel', close)));
   }
 }
+
+// ---------- duel (challenge card): first-person shootout in three.js ----------
+// Only the two duellists open the 3D view; everyone else sees the score in the banner.
+// Rules and geometry come from duel.js. Movement and aim are local (streamed via 'move'). Every shot is drawn at once
+// from a local raycast; the server's verdict ('fired') then brings the damage, the kill and the opponent's shots.
+const three = () => three.p ||= import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js');
+const NET = {
+  move: (p, reliable) => (reliable ? socket : socket.volatile).emit('move', p),
+  shoot: a => socket.emit('shoot', a),
+};
+let duel3d = null;
+async function duelSync() {
+  const D = S?.duel, inIt = D && (D.a === S.me || D.b === S.me);
+  if (inIt && !duel3d) { duel3d = { pending: true }; const T = await three(); duel3d = openDuel(T, S.duel || D, S.players, S.me, NET); }
+  if (!S?.duel && duel3d && !duel3d.pending) { duel3d.close(); duel3d = null; }
+  duel3d?.hud?.(S.duel);
+}
+socket.on('foe', p => duel3d?.foe?.(p));
+socket.on('fired', ev => duel3d?.fired?.(ev));
+function duelResult(old, s) {
+  if (!old?.duel || s.duel || (s.me !== old.duel.a && s.me !== old.duel.b)) return;
+  const line = s.log.findLast(l => / wins the duel/.test(l)) || '';
+  splash(line.includes(` ${s.players[s.me].name} wins the duel`) ? 'You won the duel!' : 'Duel lost');
+}
+
+function openDuel(T, D, players, me, net) {
+  const P = DuelPhys, A = P.ARENA, M = P.MAPS[D.map], WPN = P.WEAPONS, foeIdx = D.a === me ? D.b : D.a, R = .4, FOV = 74;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v)), ease = (dt, k) => Math.min(1, dt * k);
+  const div = (className, ...kids) => el('div', { className }, ...kids);
+  const cross = div('cross'), scopeEl = div('scope'), hurt = div('hurt'), top = div('top'), hpEl = div('hp'), ammoEl = div('ammo'), feed = div('feed'), msg = div('msg');
+  const picks = { rifle: el('span', {}, '1  Rifle'), sniper: el('span', {}, '2  Sniper') }, pick = div('pick', 'Primary weapon:   ', picks.rifle, '     ', picks.sniper);
+  const box = el('div', { id: 'duel' }, scopeEl, cross, hurt, top, hpEl, ammoEl, feed, msg, pick,
+    div('hint', 'Click to lock the mouse · WASD move · Space jump · Ctrl / C crouch · Shift walk · 1 primary  2 pistol  3 knife · Q last · R reload · F inspect · right-click scope / stab · − = sensitivity'));
+  document.body.append(box);
+  const set = (e, text) => { if (e.textContent !== text) e.textContent = text; };
+  const flashCls = (e, c, ms) => { e.classList.add(c); clearTimeout(e[c]); e[c] = setTimeout(() => e.classList.remove(c), ms); };
+
+  // ---- scene ----
+  const renderer = new T.WebGLRenderer({ antialias: true }), canvas = renderer.domElement;
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.autoClear = false; renderer.setClearColor(M.sky);
+  box.prepend(canvas);
+  const scene = new T.Scene(), vmScene = new T.Scene(); // the gun in your hands is drawn in a second pass so it never pokes into walls
+  scene.fog = new T.Fog(M.sky, 50, 160);
+  for (const s of [scene, vmScene]) { s.add(new T.HemisphereLight(0xffffff, 0x7a6a55, 1.3)); const sun = new T.DirectionalLight(0xfff2d6, 1.6); sun.position.set(8, 20, 5); s.add(sun); }
+
+  const tex = (size, paint, rx = 1, ry = 1) => {
+    const c = el('canvas', { width: size, height: size }); paint(c.getContext('2d'), size);
+    const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(rx, ry); t.colorSpace = T.SRGBColorSpace; return t;
+  };
+  const speckle = (g, s, base, n) => {
+    g.fillStyle = base; g.fillRect(0, 0, s, s);
+    for (let k = 0; k < n; k++) { g.fillStyle = `rgba(${Math.random() < .5 ? '0,0,0' : '255,255,255'},.07)`; g.fillRect(Math.random() * s, Math.random() * s, 3, 3); }
+  };
+  const mat = (color, map) => new T.MeshLambertMaterial({ color, map });
+  const block = (w, h, d, m, x, y, z, parent = scene) => { const o = new T.Mesh(new T.BoxGeometry(w, h, d), m); o.position.set(x, y, z); parent.add(o); return o; };
+  const concrete = mat(0xffffff, tex(128, (g, s) => speckle(g, s, M.wall, 500)));
+  const crate = mat(0xffffff, tex(128, (g, s) => {
+    speckle(g, s, M.crate, 300); g.strokeStyle = '#0006'; g.lineWidth = 10; g.strokeRect(5, 5, s - 10, s - 10);
+    g.beginPath(); g.moveTo(8, 8); g.lineTo(s - 8, s - 8); g.stroke();
+  }));
+  block(A.hx * 2, .2, A.hz * 2, mat(0xffffff, tex(256, (g, s) => { speckle(g, s, M.floor, 900); g.strokeStyle = '#0003'; g.lineWidth = 3; g.strokeRect(0, 0, s, s); }, A.hx, A.hz)), 0, -.1, 0); // 2 m tiles
+  for (const s of [-1, 1]) { block(A.hx * 2 + 1, 4.5, .5, concrete, 0, 2.25, s * (A.hz + .25)); block(.5, 4.5, A.hz * 2 + 1, concrete, s * (A.hx + .25), 2.25, 0); }
+  for (const [bx, bz, hx, hz, h] of M.boxes) block(hx * 2, h, hz * 2, h > 3 || Math.min(hx, hz) < .5 || Math.max(hx, hz) > 2 ? concrete : crate, bx, h / 2, bz);
+
+  // Blocky weapon models pointing down -z, grip at the origin. Used for the viewmodel and in the opponent's hands.
+  const dark = mat(0x2b2b2e), wood = mat(0x7b4a1e), steel = mat(0x9aa0a6), olive = mat(0x4d5a3a);
+  const gun = kind => {
+    const g = new T.Group(), b = (w, h, d, m, x, y, z, rx = 0) => { block(w, h, d, m, x, y, z, g).rotation.x = rx; };
+    if (kind === 'rifle') { b(.05, .07, .42, dark, 0, .04, -.2); b(.03, .03, .3, dark, 0, .05, -.55); b(.055, .06, .2, wood, 0, .03, -.38); b(.045, .09, .24, wood, 0, .01, .12, -.15); b(.04, .16, .06, dark, 0, -.08, -.14, .35); b(.04, .1, .045, wood, 0, -.06, 0, -.3); g.userData.muzzle = -.7; }
+    else if (kind === 'sniper') { b(.055, .075, .6, olive, 0, .04, -.2); b(.03, .03, .5, dark, 0, .05, -.72); b(.05, .1, .3, olive, 0, .01, .22, -.1); b(.05, .05, .26, dark, 0, .115, -.15); b(.04, .1, .05, dark, 0, -.05, -.1); b(.04, .1, .045, olive, 0, -.06, .02, -.3); g.userData.muzzle = -.97; }
+    else if (kind === 'pistol') { b(.04, .05, .2, steel, 0, .04, -.08); b(.038, .11, .05, dark, 0, -.03, 0, -.2); g.userData.muzzle = -.18; }
+    else { b(.012, .045, .22, steel, 0, .03, -.16); b(.03, .035, .11, dark, 0, .02, .01); g.userData.muzzle = -.27; }
+    return g;
+  };
+  const arsenal = parent => Object.fromEntries(Object.keys(WPN).map(k => { const g = gun(k); g.visible = false; parent.add(g); return [k, g]; }));
+  const cam = new T.PerspectiveCamera(FOV, 1, .05, 300), vmCam = new T.PerspectiveCamera(54, 1, .01, 10);
+  cam.rotation.order = 'YXZ'; scene.add(cam);
+  const vm = new T.Group(), vms = arsenal(vm); vmScene.add(vmCam); vmCam.add(vm);
+  const flashM = new T.Mesh(new T.SphereGeometry(.045, 6, 4), new T.MeshBasicMaterial({ color: 0xffd76a })); vm.add(flashM);
+
+  // Opponent: blocks that match the hit zones in duel.js (legs to .8 m, torso to 1.42 m, head at 1.6 m).
+  const foe = new T.Group(), cloth = mat(players[foeIdx].color), foeTo = {};
+  foe.rotation.order = 'YXZ'; scene.add(foe);
+  const legs = [-1, 1].map(s => { const pivot = new T.Group(); pivot.position.set(s * .13, .8, 0); block(.2, .8, .22, mat(0x3a3f4a), 0, -.4, 0, pivot); foe.add(pivot); return pivot; });
+  block(.5, .62, .28, cloth, 0, 1.11, 0, foe);
+  const headG = new T.Group(), arms = new T.Group(), held = arsenal(arms);
+  headG.position.y = 1.6; block(.3, .34, .3, mat(0xf1c27d), 0, 0, 0, headG); block(.33, .12, .33, dark, 0, .15, 0, headG);
+  arms.position.y = 1.32; block(.12, .12, .5, cloth, .24, -.06, -.2, arms); block(.12, .12, .5, cloth, -.2, -.06, -.22, arms);
+  for (const k in held) held[k].position.set(.1, -.02, -.45);
+  foe.add(headG, arms);
+
+  // ---- sound: synthesized, placed in 3D for everything the opponent does (footsteps give positions away) ----
+  const ac = new (window.AudioContext || window.webkitAudioContext)(), nbuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+  nbuf.getChannelData(0).forEach((_, k, a) => a[k] = Math.random() * 2 - 1);
+  const snd = ({ f = 1500, dur = .15, vol = .4, tone = 0, to = tone, type = 'lowpass' }, at) => { // noise burst and/or a swept tone
+    if (muted) return;
+    const t = ac.currentTime, g = ac.createGain();
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+    if (at) {
+      const p = ac.createPanner(); p.panningModel = 'HRTF'; p.refDistance = 4; p.rolloffFactor = 1.2;
+      p.positionX.value = at.x; p.positionY.value = at.y ?? 1.4; p.positionZ.value = at.z; g.connect(p).connect(ac.destination);
+    } else g.connect(ac.destination);
+    if (f) { const s = ac.createBufferSource(), fl = ac.createBiquadFilter(); s.buffer = nbuf; fl.type = type; fl.frequency.value = f; s.connect(fl).connect(g); s.start(t, Math.random() * .5, dur); }
+    if (tone) { const o = ac.createOscillator(); o.frequency.setValueAtTime(tone, t); o.frequency.exponentialRampToValueAtTime(to, t + dur); o.connect(g); o.start(t); o.stop(t + dur); }
+  };
+  const SND = { rifle: { f: 2200, dur: .2, vol: .5, tone: 160, to: 50 }, pistol: { f: 3000, dur: .13, vol: .4, tone: 220, to: 70 }, sniper: { f: 1200, dur: .7, vol: .9, tone: 110, to: 35 },
+    knife: { f: 5000, dur: .1, vol: .12, type: 'highpass' }, step: { f: 350, dur: .07, vol: .6 }, ding: { f: 0, dur: .25, vol: .35, tone: 2400, to: 1800 },
+    thud: { f: 500, dur: .08, vol: .4 }, click: { f: 6000, dur: .03, vol: .2, type: 'highpass' }, hurt: { f: 700, dur: .12, vol: .5, tone: 90, to: 60 } };
+
+  // ---- short-lived effects ----
+  const fx = [], holes = [], puffGeo = new T.SphereGeometry(.06, 6, 4), holeGeo = new T.SphereGeometry(.025, 6, 4), holeMat = new T.MeshBasicMaterial({ color: 0x1b1b1b });
+  const tracer = (from, to) => { const m = new T.Line(new T.BufferGeometry().setFromPoints([from, to]), new T.LineBasicMaterial({ color: 0xfff1a8, transparent: true })); scene.add(m); fx.push({ m, t: 0, life: .09 }); };
+  const puff = (p, color) => { const m = new T.Mesh(puffGeo, new T.MeshBasicMaterial({ color, transparent: true })); m.position.copy(p); scene.add(m); fx.push({ m, t: 0, life: .25, grow: 5 }); };
+  const hole = p => { const m = new T.Mesh(holeGeo, holeMat); m.position.copy(p); scene.add(m); holes.push(m); if (holes.length > 80) scene.remove(holes.shift()); };
+  const wallHit = (end, w) => { puff(end, 0xd8cfc0); if (WPN[w].mag) hole(end); };
+
+  // ---- player state ----
+  let x = 0, y = 0, z = 0, yaw = 0, pitch = 0, vx = 0, vy = 0, vz = 0, ground = true, crouch = false, eyeH = 1.6, jumpQ = 0, stepD = 0, bob = 0, deadT = 0;
+  let primary = 'rifle', cur = 'rifle', prev = 'pistol', ammo = {}, readyAt = 0, reloadAt = 0, lastShot = 0, heat = 0, zoom = 0, firing = false, kick = 0, vmKick = 0, inspectAt = -1e9;
+  let hp = 100, foeHp = 100, score = D.score, round = 0, liveAt = 0, endsAt = 0, post = false, roundWinner = null, note = '', noteUntil = 0;
+  let sens = +localStorage.duelSens || 1, foeWalk = 0, foeStepD = 0;
+  const vp = [0, 0], sway = [0, 0];
+  const aimDir = (p, yw) => ({ x: -Math.sin(yw) * Math.cos(p), y: Math.sin(p), z: -Math.cos(yw) * Math.cos(p) });
+  const myPos = () => ({ x, y, z, yaw, pitch, c: crouch, w: cur });
+  const scoped = () => cur === 'sniper' && zoom;
+  const spawn = Dv => {
+    ({ x, y, z, yaw, pitch } = Dv.pos[me]); vx = vy = vz = heat = zoom = reloadAt = 0; firing = false;
+    ammo = Object.fromEntries(Object.entries(WPN).map(([k, w]) => [k, { mag: w.mag, res: w.reserve }]));
+    Object.assign(foeTo, Dv.pos[foeIdx]); foe.position.set(foeTo.x, foeTo.y, foeTo.z); foe.rotation.set(0, foeTo.yaw, 0);
+  };
+
+  const reload = t => { const W = WPN[cur], a = ammo[cur]; if (!W.mag || reloadAt || a.mag === W.mag || !a.res) return; reloadAt = t + W.reload; zoom = 0; inspectAt = -1e9; snd(SND.click); };
+  const select = k => { if (!WPN[k] || k === cur) return; prev = cur; cur = k; readyAt = performance.now() + WPN[k].draw; reloadAt = heat = zoom = 0; inspectAt = -1e9; snd(SND.click); };
+  const fire = (t, alt) => {
+    const W = WPN[cur], a = ammo[cur];
+    if (t < liveAt || post || hp <= 0 || t < readyAt || reloadAt || t - lastShot < (alt && W.altRate || W.rate)) return;
+    lastShot = t; inspectAt = -1e9;
+    if (W.mag && !a.mag--) { a.mag = 0; firing = false; snd(SND.click); return reload(t); }
+    // Where the bullet goes: the view, plus the spray pattern, plus a random cone that grows when moving or airborne.
+    const [pp, py] = W.pat(heat), speed = Math.hypot(vx, vz);
+    const cone = (W.spread + W.move * clamp((speed / W.speed - .34) / .66, 0, 1) + (ground ? 0 : W.air) + (W.unscoped && !zoom ? W.unscoped : 0)) * (crouch && ground ? .7 : 1);
+    const r = cone * Math.sqrt(Math.random()), an = Math.random() * 7;
+    const dir = aimDir(pitch + pp + r * Math.sin(an), yaw + py + r * Math.cos(an)), o = P.eye(myPos());
+    const max = P.wall(o, dir, W.range || 200, M.boxes), h = foeHp > 0 && P.hitBody(o, dir, { x: foe.position.x, y: foe.position.y, z: foe.position.z, c: foeTo.c });
+    const d = h && h.t < max ? h.t : max, end = new T.Vector3(o.x + dir.x * d, o.y + dir.y * d, o.z + dir.z * d);
+    if (W.mag) tracer(new T.Vector3(.16, -.12, -.8).applyQuaternion(cam.quaternion).add(cam.position), end);
+    if (d === max && max < (W.range || 200)) wallHit(end, cur);
+    heat = Math.floor(heat) + 1; kick += cur === 'sniper' ? .05 : .01; vmKick = 1;
+    if (cur === 'sniper') zoom = 0;
+    snd(SND[cur]);
+    net.shoot({ p: myPos(), dir, w: cur, alt });
+  };
+
+  // ---- input ----
+  const keys = new Set(), key = c => +keys.has(c), locked = () => document.pointerLockElement === canvas;
+  const kd = e => {
+    keys.add(e.code);
+    if (e.code === 'Space' || e.code === 'Tab' || e.ctrlKey) e.preventDefault(); // Ctrl is crouch: no Ctrl+S / Ctrl+D dialogs
+    if (e.repeat) return;
+    // Freeze time is the buy menu: 1 / 2 pick the primary for this round. Once live: 1 primary, 2 pistol, 3 knife.
+    const now = performance.now(), buy = now < liveAt && { Digit1: 'rifle', Digit2: 'sniper' }[e.code], k = { Digit1: primary, Digit2: 'pistol', Digit3: 'knife' }[e.code];
+    if (buy) { if (buy !== primary) snd(SND.click); primary = cur = buy; prev = 'pistol'; readyAt = reloadAt = heat = zoom = 0; }
+    else if (k) select(k);
+    else if (e.code === 'KeyQ') select(prev);
+    else if (e.code === 'KeyR') reload(performance.now());
+    else if (e.code === 'KeyF') { if (!reloadAt && !scoped()) inspectAt = performance.now(); }
+    else if (e.code === 'Space') jumpQ = performance.now();
+    else if (e.code === 'Minus' || e.code === 'Equal') {
+      localStorage.duelSens = sens = clamp(sens * (e.code === 'Minus' ? .9 : 1.1), .2, 5);
+      note = `Sensitivity ${sens.toFixed(2)}`; noteUntil = performance.now() + 1200;
+    }
+  };
+  const ku = e => keys.delete(e.code);
+  const look = e => {
+    if (!locked()) return;
+    const k = .0022 * sens * cam.fov / FOV; // slower when scoped
+    yaw -= e.movementX * k; pitch = clamp(pitch - e.movementY * k, -1.5, 1.5);
+    sway[0] = clamp(sway[0] + e.movementX * .00005, -.03, .03); sway[1] = clamp(sway[1] + e.movementY * .00005, -.03, .03);
+  };
+  const md = e => {
+    ac.resume();
+    // raw mouse input (no OS acceleration) where the browser has it
+    if (!locked()) {
+      // Fullscreen + keyboard lock hands Ctrl+W to the game (Chrome/Edge) instead of closing the tab while crouch-walking.
+      if (!document.fullscreenElement) box.requestFullscreen?.().then(() => navigator.keyboard?.lock?.()).catch(() => {});
+      return void (canvas.requestPointerLock({ unadjustedMovement: true }) || Promise.resolve()).catch(() => canvas.requestPointerLock());
+    }
+    const t = performance.now();
+    if (e.button === 0) { firing = true; fire(t); }
+    else if (e.button === 2 && cur === 'sniper') { if (!reloadAt && t >= readyAt) { zoom = (zoom + 1) % 3; inspectAt = -1e9; } }
+    else if (e.button === 2 && cur === 'knife') fire(t, true);
+  };
+  const mu = e => { if (e.button === 0) firing = false; };
+  const blur = () => { keys.clear(); firing = false; };
+  const resize = () => { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); for (const c of [cam, vmCam]) { c.aspect = w / h; c.updateProjectionMatrix(); } };
+  const LISTEN = [['resize', resize], ['keydown', kd], ['keyup', ku], ['mousemove', look], ['mouseup', mu], ['blur', blur]];
+  for (const [n, fn] of LISTEN) addEventListener(n, fn);
+  canvas.addEventListener('mousedown', md); box.addEventListener('contextmenu', e => e.preventDefault());
+  resize();
+
+  // ---- frame ----
+  let raf, lastT = performance.now(), sendT = 0;
+  const loop = () => {
+    raf = requestAnimationFrame(loop);
+    const t = performance.now(), dt = Math.min(.05, (t - lastT) / 1000); lastT = t; // same clock as the input handlers
+    const W = WPN[cur], a = ammo[cur], alive = hp > 0, free = alive && t >= liveAt;
+
+    // Movement: friction + acceleration on the ground (stopping takes a moment, so counter-strafing pays off),
+    // a small capped air acceleration (air-strafing), re-press Space to jump.
+    crouch = alive && (keys.has('ControlLeft') || keys.has('KeyC'));
+    const f = free ? key('KeyW') - key('KeyS') : 0, s = free ? key('KeyD') - key('KeyA') : 0, wl = Math.hypot(f, s) || 1;
+    const wx = (-Math.sin(yaw) * f + Math.cos(yaw) * s) / wl, wz = (-Math.cos(yaw) * f - Math.sin(yaw) * s) / wl;
+    const max = f || s ? W.speed * (scoped() ? .6 : 1) * (crouch ? .34 : keys.has('ShiftLeft') ? .52 : 1) : 0;
+    const accel = (wish, k) => { const add = wish - (vx * wx + vz * wz); if (add > 0) { const dv = Math.min(k * max * dt, add); vx += wx * dv; vz += wz * dv; } };
+    if (ground) {
+      const sp = Math.hypot(vx, vz);
+      if (sp) { const k = Math.max(0, sp - Math.max(sp, 2) * 5.2 * dt) / sp; vx *= k; vz *= k; }
+      accel(max, 5.5);
+      if (free && t - jumpQ < 120) { vy = 7.2; jumpQ = 0; }
+    } else { accel(Math.min(max, .76), 12); vy -= 20 * dt; }
+    // Slide along walls one axis at a time; a block only stops you while your feet are below its top, so low ones
+    // can be jumped onto, and on the ground anything up to P.STEP higher is simply walked up (stairs).
+    const over = (px, pz, [bx, bz, hx, hz]) => Math.abs(px - bx) < hx + R && Math.abs(pz - bz) < hz + R;
+    const solid = (px, pz) => Math.abs(px) > A.hx - R || Math.abs(pz) > A.hz - R || M.boxes.some(b => y < b[4] - .01 - (ground ? P.STEP : 0) && over(px, pz, b));
+    if (solid(x + vx * dt, z)) vx = 0; else x += vx * dt;
+    if (solid(x, z + vz * dt)) vz = 0; else z += vz * dt;
+    y += vy * dt;
+    const floor = Math.max(0, ...M.boxes.map(b => over(x, z, b) ? b[4] : 0));
+    ground = y <= floor;
+    if (ground) { y = floor; vy = 0; }
+    const speed = Math.hypot(vx, vz);
+    if (ground) { bob += speed * dt; if (speed > 3.5 && (stepD += speed * dt) > 2.2) { stepD = 0; snd({ ...SND.step, vol: .2 }); } } // walking and crouching are silent
+
+    // Weapon: automatic fire, reload, recoil recovery.
+    if (firing && W.auto) fire(t);
+    if (reloadAt && t >= reloadAt) { const n = Math.min(W.mag - a.mag, a.res); a.mag += n; a.res -= n; reloadAt = 0; snd(SND.click); }
+    if (t - lastShot > W.rate * 1.6) heat = Math.max(0, heat - W.cool * dt);
+    const [tp, ty] = W.pat(heat);
+    vp[0] += (tp - vp[0]) * ease(dt, 25); vp[1] += (ty - vp[1]) * ease(dt, 25); kick *= 1 - ease(dt, 10);
+
+    // Camera: the view only shows half the recoil, bullets take all of it.
+    eyeH += ((crouch ? 1.15 : 1.6) - eyeH) * ease(dt, 12); deadT = alive ? 0 : Math.min(1, deadT + dt * 3);
+    cam.position.set(x, y + eyeH * (1 - .8 * deadT), z); cam.rotation.set(pitch + vp[0] * .5 + kick, yaw + vp[1] * .5, deadT * .6);
+    const fov = scoped() ? (zoom === 1 ? 30 : 10) : FOV;
+    if (cam.fov !== fov) { cam.fov = fov; cam.updateProjectionMatrix(); }
+    for (const k in vms) vms[k].visible = k === cur && alive && !scoped();
+    const draw = clamp((readyAt - t) / W.draw, 0, 1), rl = reloadAt ? Math.sin(Math.PI * clamp(1 - (reloadAt - t) / W.reload, 0, 1)) : 0;
+    vmKick *= 1 - ease(dt, 14); sway[0] *= 1 - ease(dt, 8); sway[1] *= 1 - ease(dt, 8);
+    vm.position.set(.2 + Math.cos(bob * 1.6) * .006 - sway[0], -.2 + Math.abs(Math.sin(bob * 1.6)) * .008 - draw * .25 - rl * .18 + sway[1], -.6 + vmKick * (W.mag ? .05 : -.15));
+    // Inspect (F): swing the weapon up and across, roll it to show both sides, bring it back.
+    const ip = clamp((t - inspectAt) / 2600, 0, 1), ik = Math.sin(Math.PI * ip) ** .6, roll = Math.sin(Math.PI * 2 * ip);
+    vm.position.x -= ik * .1; vm.position.y += ik * .06;
+    vm.rotation.set(vmKick * .08 - rl * .7 - draw * .8 + ik * .35, -sway[0] * 2 + ik * (.9 + roll * .5), ik * (.3 - roll * .8));
+    flashM.visible = !!W.mag && alive && !scoped() && t - lastShot < 45; flashM.position.set(0, .05, vms[cur].userData.muzzle);
+    if (t - sendT > 50) { sendT = t; net.move(myPos()); }
+
+    // Opponent: ease toward the latest report; walk cycle and footsteps from how fast the model actually moves.
+    const k = ease(dt, 15), fp = foe.position, px = fp.x, pz = fp.z, down = foeHp <= 0;
+    fp.x += (foeTo.x - fp.x) * k; fp.y += (foeTo.y - fp.y) * k; fp.z += (foeTo.z - fp.z) * k;
+    foe.rotation.y += Math.atan2(Math.sin(foeTo.yaw - foe.rotation.y), Math.cos(foeTo.yaw - foe.rotation.y)) * k;
+    foe.rotation.x += ((down ? -1.5 : 0) - foe.rotation.x) * ease(dt, 8);
+    foe.scale.y += ((foeTo.c ? .72 : 1) - foe.scale.y) * k;
+    headG.rotation.x = arms.rotation.x = down ? 0 : foeTo.pitch || 0;
+    for (const w in held) held[w].visible = w === (foeTo.w || 'rifle');
+    const fd = Math.hypot(fp.x - px, fp.z - pz), fs = dt ? fd / dt : 0;
+    foeWalk += fd; legs[0].rotation.x = Math.sin(foeWalk * 3) * Math.min(.6, fs * .12); legs[1].rotation.x = -legs[0].rotation.x;
+    if (!down && fs > 3.5 && (foeStepD += fd) > 2.2) { foeStepD = 0; snd(SND.step, { x: fp.x, y: fp.y, z: fp.z }); }
+    const L = ac.listener, fw = aimDir(pitch, yaw);
+    if (L.positionX) { L.positionX.value = x; L.positionY.value = y + eyeH; L.positionZ.value = z; L.forwardX.value = fw.x; L.forwardY.value = fw.y; L.forwardZ.value = fw.z; }
+    else { L.setPosition(x, y + eyeH, z); L.setOrientation(fw.x, fw.y, fw.z, 0, 1, 0); }
+
+    for (let i = fx.length - 1; i >= 0; i--) {
+      const e = fx[i]; e.t += dt; e.m.material.opacity = 1 - e.t / e.life;
+      if (e.grow) e.m.scale.setScalar(1 + e.grow * e.t / e.life);
+      if (e.t >= e.life) { scene.remove(e.m); e.m.material.dispose(); if (e.m.isLine) e.m.geometry.dispose(); fx.splice(i, 1); }
+    }
+
+    const sec = Math.max(0, Math.ceil((endsAt - Math.max(t, liveAt)) / 1000));
+    set(top, `You  ${score[me]}   ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}   ${score[foeIdx]}  ${players[foeIdx].name}`);
+    set(hpEl, `✚ ${Math.max(0, hp)}`); hpEl.classList.toggle('low', hp <= 30);
+    set(ammoEl, `${W.name}${reloadAt ? ' · reloading' : ''}\n${W.mag ? `${a.mag} / ${a.res}` : '—'}`);
+    set(msg, post ? (roundWinner === me ? 'Round won' : 'Round lost') : t < liveAt ? `${M.name} · Round ${round} · ${Math.ceil((liveAt - t) / 1000)}` : t < noteUntil ? note : '');
+    pick.style.display = t < liveAt && !post ? 'block' : ''; for (const k in picks) picks[k].classList.toggle('on', k === primary);
+    cross.style.display = cur === 'sniper' || !alive ? 'none' : ''; scopeEl.style.display = scoped() ? 'block' : '';
+    renderer.clear(); renderer.render(scene, cam); renderer.clearDepth(); renderer.render(vmScene, vmCam);
+  };
+
+  const api = {
+    foe(p) { if (p) Object.assign(foeTo, p); },
+    hud(Dv) {
+      if (!Dv) return;
+      const t = performance.now();
+      if (Dv.round !== round) { round = Dv.round; spawn(Dv); }
+      hp = Dv.hp[me]; foeHp = Dv.hp[foeIdx]; score = Dv.score; post = Dv.post; roundWinner = Dv.roundWinner; liveAt = t + Dv.liveIn; endsAt = t + Dv.left;
+    },
+    fired(ev) {
+      const end = new T.Vector3(ev.end.x, ev.end.y, ev.end.z);
+      if (ev.from !== me) { // the opponent's shot: heard from where they stand, tracer, and the damage if it landed
+        snd(SND[ev.w], ev.o);
+        if (WPN[ev.w].mag) tracer(new T.Vector3(ev.o.x, ev.o.y - .15, ev.o.z), end);
+        if (ev.zone) { hp = ev.hp; kick += .03; flashCls(hurt, 'on', 120); snd(SND.hurt); } else if (ev.w !== 'knife') wallHit(end, ev.w);
+      } else if (ev.zone) { foeHp = ev.hp; puff(end, 0xb01818); snd(ev.zone === 'head' ? SND.ding : SND.thud); }
+      if (ev.killed) {
+        const line = el('div', {}, `${players[ev.from].name}  [${WPN[ev.w].name}${ev.zone === 'head' ? ' · headshot' : ''}]  ${players[ev.from === me ? foeIdx : me].name}`);
+        feed.append(line); setTimeout(() => line.remove(), 5000);
+      }
+    },
+    close() {
+      cancelAnimationFrame(raf);
+      for (const [n, fn] of LISTEN) removeEventListener(n, fn);
+      if (document.pointerLockElement) document.exitPointerLock();
+      if (document.fullscreenElement) document.exitFullscreen();
+      ac.close(); renderer.dispose(); box.remove();
+    },
+  };
+  api.hud(D);
+  raf = requestAnimationFrame(loop);
+  return api;
+}
+
+// /test-duel: practice offline against a bot. Same rules (duel.js); here the page plays the server's part.
+async function testDuel() {
+  socket.disconnect();
+  $('lobby').classList.add('hidden');
+  const T = await three(), P = DuelPhys, players = [{ name: 'You', color: '#29b6f6' }, { name: 'Bot', color: '#e4572e' }];
+  let D = P.create(0, 1, Date.now(), location.hash.slice(1)), g; // /test-duel#forest picks the map
+  const boxes = P.MAPS[D.map].boxes;
+  const sync = () => g.hud(P.view(D, Date.now()));
+  const shoot = (i, a) => {
+    try { g.fired(P.shoot(D, i, a, Date.now())); } catch { return; }
+    if (D.winner !== null) { splash(D.winner ? 'Duel lost' : 'You won the duel!'); D = P.create(0, 1, Date.now(), D.map); }
+    sync();
+  };
+  g = openDuel(T, P.view(D, Date.now()), players, 0, { move: p => P.move(D, 0, p, Date.now()), shoot: a => { P.move(D, 0, a.p, Date.now()); shoot(0, a); } });
+  document.querySelector('#duel').append($('turnSplash')); // splash on top of the 3D view
+  // Bot: wanders between waypoints it can walk straight to; when it sees you it stops, takes REACT ms, then fires 5-round bursts.
+  // ponytail: no pathfinding, hearing or prediction; REACT and WOBBLE (aim error, rad) set the difficulty.
+  const REACT = 450, WOBBLE = .035, half = [[0, 31], [-10, 31], [10, 31], [-16, 28], [16, 28], [6, 24], [-6, 24], [5.8, 18], [5.8, 6], [-4, 18], [-4, 6], [7, 18.5], [7, 1.5], [-7, 10.5],
+    [10, 20], [14, 24], [17, 12], [10, 1.5], [19, 1], [-10, 24], [-10.5, 10.5], [-13, 1], [-12, 14]];
+  const WAY = [...half, ...half.map(([x, z]) => [-x, -z])].map(([x, z]) => ({ x, z }));
+  const clear = (a, b) => { const dx = b.x - a.x, dz = b.z - a.z, n = Math.hypot(dx, dz) || 1; return P.wall({ x: a.x, y: .3, z: a.z }, { x: dx / n, y: 0, z: dz / n }, n, boxes) >= n; };
+  let goal = null, seen = 0, burst = 0;
+  setInterval(() => {
+    const now = Date.now();
+    if (P.tick(D, now)) sync();
+    const b = D.pos[1];
+    if (now < D.live || D.next || D.hp[1] <= 0) { goal = null; seen = 0; return g.foe(b); }
+    const eb = P.eye(b), ep = P.eye(D.pos[0]), dx = ep.x - eb.x, dy = ep.y - .4 - eb.y, dz = ep.z - eb.z, n = Math.hypot(dx, dy, dz);
+    let { x, z, yaw, pitch } = b;
+    if (D.hp[0] > 0 && P.wall(eb, { x: dx / n, y: dy / n, z: dz / n }, n, boxes) >= n) {
+      seen ||= now; yaw = Math.atan2(-dx, -dz); pitch = Math.asin(dy / n);
+      const e = () => (Math.random() - .5) * 2 * WOBBLE;
+      if (now - seen > REACT && (burst = (burst + 1) % 24) < 10 && burst % 2) shoot(1, { dir: { x: dx / n + e(), y: dy / n + e(), z: dz / n + e() }, w: 'rifle' });
+    } else {
+      seen = 0;
+      if (!goal || Math.hypot(goal.x - x, goal.z - z) < .3) { const opts = WAY.filter(w => Math.hypot(w.x - x, w.z - z) > 1 && clear(b, w)); goal = opts[Math.floor(Math.random() * opts.length)] || goal; }
+      if (goal) { const gx = goal.x - x, gz = goal.z - z, gn = Math.hypot(gx, gz) || 1, st = Math.min(gn, 4.5 * .05); x += gx / gn * st; z += gz / gn * st; yaw = Math.atan2(-gx, -gz); pitch = 0; }
+    }
+    P.move(D, 1, { x, y: 0, z, yaw, pitch, w: 'rifle' }, now); g.foe(D.pos[1]);
+  }, 50);
+}
+if (location.pathname === '/test-duel') testDuel();
 
 // ---------- board canvas ----------
 // Two layers: the island (everything static) is drawn into `layer` only when something changes;
@@ -330,7 +777,7 @@ const IMG = Object.fromEntries(Object.keys(TCOL).map(t => {
 }));
 
 // Terrain textures: small repeating tiles painted once, used as fill patterns.
-const YIELD = { forest: 'timber', quarry: 'clay', meadow: 'wool', farm: 'grain', mine: 'metal' };
+const YIELD = { forest: 'wood', hills: 'brick', pasture: 'sheep', fields: 'wheat', mountains: 'ore' };
 const tile = (bg, paint) => {
   const c = document.createElement('canvas'); c.width = c.height = 24;
   const g = c.getContext('2d'); g.fillStyle = bg; g.fillRect(0, 0, 24, 24); paint(g);
@@ -343,19 +790,19 @@ const PAT = {
       g.fillStyle = '#4e342e'; g.fillRect(x - 1, y + 9, 2, 2);
     }
   }),
-  quarry: tile(TCOL.quarry, g => {
+  hills: tile(TCOL.hills, g => {
     g.strokeStyle = '#7a3b1e'; g.lineWidth = 1.5;
     g.strokeRect(0, 0, 12, 12); g.strokeRect(12, 0, 12, 12); g.strokeRect(-6, 12, 12, 12); g.strokeRect(6, 12, 12, 12); g.strokeRect(18, 12, 12, 12);
   }),
-  meadow: tile(TCOL.meadow, g => {
+  pasture: tile(TCOL.pasture, g => {
     g.strokeStyle = '#689f38'; g.lineWidth = 1.5;
     for (const [x, y] of [[5, 8], [17, 20], [15, 5]]) { g.beginPath(); g.moveTo(x - 3, y - 4); g.lineTo(x, y); g.lineTo(x + 3, y - 4); g.moveTo(x, y); g.lineTo(x, y - 5); g.stroke(); }
   }),
-  farm: tile(TCOL.farm, g => {
+  fields: tile(TCOL.fields, g => {
     g.strokeStyle = '#b8901e'; g.lineWidth = 2;
     for (const o of [-24, -12, 0, 12, 24]) { g.beginPath(); g.moveTo(o, 24); g.lineTo(o + 24, 0); g.stroke(); }
   }),
-  mine: tile(TCOL.mine, g => {
+  mountains: tile(TCOL.mountains, g => {
     g.fillStyle = '#37474f'; for (const [x, y] of [[4, 5], [16, 9], [9, 18], [21, 21]]) { g.beginPath(); g.arc(x, y, 2.5, 0, 7); g.fill(); }
     g.fillStyle = '#cfd8dc'; for (const [x, y] of [[12, 3], [3, 13], [19, 15]]) g.fillRect(x, y, 2, 2);
   }),
@@ -418,10 +865,10 @@ new ResizeObserver(fit).observe(cv); // also catches hidden -> visible, unlike w
 
 function targets() {
   if (!S?.board || !mine()) return null;
-  if (S.phase === 'main' && S.step === 'bandit') return { kind: 'h', ids: S.board.hexes.map((_, i) => i).filter(i => i !== S.board.bandit) };
+  if (S.phase === 'main' && S.step === 'robber') return { kind: 'h', ids: S.board.hexes.map((_, i) => i).filter(i => i !== S.board.robber) };
   const build = S.phase === 'setup' ? S.step : mode;
   if (!S.legal || !build) return null;
-  return { kind: build === 'route' ? 'e' : 'v', ids: S.legal[build + 's'], build };
+  return { kind: build === 'road' ? 'e' : 'v', ids: S.legal[PLURAL[build]], build };
 }
 
 function draw() {
@@ -465,7 +912,7 @@ function draw() {
     text(e.port === 'any' ? '?' : ICON[e.port], px, py + .07, .11, '#3b2a12');
   }
 
-  // Dirt roads along every tile edge; they fill the gaps between tiles. Built routes are drawn over them later.
+  // Dirt roads along every tile edge; they fill the gaps between tiles. Built roads are drawn over them later.
   for (const e of B.edges) {
     const pts = [[V[e.a].x, V[e.a].y], [V[e.b].x, V[e.b].y]];
     line(pts, .17, '#6b4a2b'); line(pts, .11, '#a8834f');
@@ -507,7 +954,14 @@ function draw() {
       text(h.num, h.x, h.y - .04, .24, hot ? '#c62828' : '#222');
       text('•'.repeat(6 - Math.abs(7 - h.num)), h.x, h.y + .17, .12, hot ? '#c62828' : '#222');
     }
-    if (i === B.bandit) { circle(h.x, h.y - .55, .2, '#111', '#000'); text('🗡️', h.x, h.y - .55, .22, '#fff'); }
+    if (i !== B.robber) return;
+    const img = PIECE.robber;
+    if (ready(img)) { // /img/robber.png: figure stands just above the number token
+      const w = .8 * s, ih = w * img.naturalHeight / img.naturalWidth, [x, y] = P(h.x, h.y - .2);
+      ctx.save(); ctx.shadowColor = '#000a'; ctx.shadowBlur = .12 * s; ctx.shadowOffsetY = .05 * s;
+      ctx.drawImage(img, x - w / 2, y - ih, w, ih);
+      ctx.restore();
+    } else { circle(h.x, h.y - .55, .2, '#111', '#000'); text('🗡️', h.x, h.y - .55, .22, '#fff'); }
   });
 
   // Roads: each player's whole network is stroked as ONE path (outline, curb, cobbles), so bends are
@@ -517,7 +971,7 @@ function draw() {
     if (!mine.length) return;
     ctx.beginPath();
     for (const e of mine) { ctx.moveTo(...P(V[e.a].x, V[e.a].y)); ctx.lineTo(...P(V[e.b].x, V[e.b].y)); }
-    if (!ready(PIECE.route)) { ctx.lineWidth = .2 * s; ctx.strokeStyle = '#000a'; ctx.stroke(); ctx.lineWidth = .12 * s; ctx.strokeStyle = pl.color; ctx.stroke(); return; }
+    if (!ready(PIECE.road)) { ctx.lineWidth = .2 * s; ctx.strokeStyle = '#000a'; ctx.stroke(); ctx.lineWidth = .12 * s; ctx.strokeStyle = pl.color; ctx.stroke(); return; }
     const th = .19 * s;
     ctx.lineCap = ctx.lineJoin = 'round';
     ctx.save(); ctx.shadowColor = '#0009'; ctx.shadowBlur = .08 * s; ctx.shadowOffsetY = .03 * s;
@@ -540,7 +994,7 @@ function draw() {
   const built = V.filter(v => v.owner !== null).sort((a, b) => a.y - b.y);
   // Clearings: level ground under each building so it doesn't sit on treetops or peaks.
   for (const v of built) {
-    const [x, y] = P(v.x, v.y), rx = (v.town ? .6 : .48) * s, ry = rx * .62 * TILT / .8;
+    const [x, y] = P(v.x, v.y), rx = (v.city ? .6 : .48) * s, ry = rx * .62 * TILT / .8;
     const g = ctx.createRadialGradient(x, y, 0, x, y, rx);
     g.addColorStop(0, '#7d6440'); g.addColorStop(.62, '#8c7148'); g.addColorStop(1, '#8c714800');
     ctx.save(); ctx.translate(x, y); ctx.scale(1, ry / rx); ctx.translate(-x, -y);
@@ -549,19 +1003,19 @@ function draw() {
   }
   // Buildings back-to-front so nearer ones overlap farther ones.
   for (const v of built) {
-    const c = S.players[v.owner].color, img = PIECE[v.town ? 'town' : 'outpost'];
+    const c = S.players[v.owner].color, img = PIECE[v.city ? 'city' : 'settlement'];
     if (ready(img)) {
-      const w = (v.town ? .95 : .75) * s, h = w * img.naturalHeight / img.naturalWidth, [x, y] = P(v.x, v.y);
+      const w = (v.city ? .95 : .75) * s, h = w * img.naturalHeight / img.naturalWidth, [x, y] = P(v.x, v.y);
       ctx.save(); ctx.shadowColor = '#000a'; ctx.shadowBlur = .12 * s; ctx.shadowOffsetY = .05 * s;
       ctx.drawImage(tint(img, c), x - w / 2, y - h * .7, w, h); // base platform centred on the corner
       ctx.restore();
-    } else if (v.town) { const [x, y] = P(v.x, v.y), z = .22 * s; ctx.fillStyle = c; ctx.fillRect(x - z, y - z, 2 * z, 2 * z); ctx.lineWidth = .05 * s; ctx.strokeStyle = '#000'; ctx.strokeRect(x - z, y - z, 2 * z, 2 * z); }
+    } else if (v.city) { const [x, y] = P(v.x, v.y), z = .22 * s; ctx.fillStyle = c; ctx.fillRect(x - z, y - z, 2 * z, 2 * z); ctx.lineWidth = .05 * s; ctx.strokeStyle = '#000'; ctx.strokeRect(x - z, y - z, 2 * z, 2 * z); }
     else circle(v.x, v.y, .16, c, '#000');
   }
 }
 
 // Player pieces: white art from cut_tile.py, tinted per player (multiply keeps the painted shading).
-const PIECE = Object.fromEntries(['outpost', 'town', 'route'].map(n => [n, Object.assign(new Image(), { src: `/img/${n}.png`, onload: () => draw() })]));
+const PIECE = Object.fromEntries(['settlement', 'city', 'road', 'robber'].map(n => [n, Object.assign(new Image(), { src: `/img/${n}.png`, onload: () => draw() })]));
 const ready = img => img.complete && img.naturalWidth;
 const tinted = new Map();
 function tint(img, color) {
@@ -580,7 +1034,7 @@ function tint(img, color) {
 function cobbles(color) {
   const key = 'cob' + color;
   if (!tinted.has(key)) {
-    const img = PIECE.route, t = tint(img, color), c = document.createElement('canvas');
+    const img = PIECE.road, t = tint(img, color), c = document.createElement('canvas');
     const sx = img.naturalWidth * .3, sy = img.naturalHeight * .2, sw = Math.round(img.naturalWidth * .3), sh = Math.round(img.naturalHeight * .6);
     c.width = sw; c.height = sh;
     c.getContext('2d').drawImage(t, sx, sy, sw, sh, 0, 0, sw, sh);
@@ -663,7 +1117,7 @@ requestAnimationFrame(frame);
 const PREVIEW = new URLSearchParams(location.search).has('preview');
 async function preview() {
   S = { board: await (await fetch('/board')).json(), players: [], phase: 'preview' };
-  $('lobby').classList.add('hidden'); $('side').classList.add('hidden'); $('game').classList.remove('hidden');
+  $('lobby').classList.add('hidden'); $('side').classList.add('hidden'); $('actions').classList.add('hidden'); $('game').classList.remove('hidden');
   $('banner').textContent = 'Preview — click for a new board'; $('banner').classList.remove('hidden');
   fit();
 }
@@ -671,7 +1125,7 @@ if (PREVIEW) {
   socket.disconnect(); preview();
   $('board').style.height = '100vh'; // no side panel here, so the board takes the whole screen (also on narrow layouts)
   // sound test panel (ignores mute so you can always hear them here)
-  const SOUNDS = { dice: '🎲 Dice', gain: '✨ Gain', build: '🔨 Build', buy: '🪙 Buy card', card: '🃏 Play card', bandits: '🗡️ Bandits', trade: '🔔 Trade offer', accepted: '🤝 Accepted', gulls: '🐦 Gulls', win: '🏆 Win', click: '🖱️ Click', chat: '💬 Chat', join: '🚪 Join', award: '🏅 Award' };
+  const SOUNDS = { dice: '🎲 Dice', gain: '✨ Gain', build: '🔨 Build', buy: '🪙 Buy development card', card: '🃏 Play card', robber: '🗡️ Robber', trade: '🔔 Trade offer', accepted: '🤝 Accepted', gulls: '🐦 Gulls', win: '🏆 Win', click: '🖱️ Click', chat: '💬 Chat', join: '🚪 Join', award: '🏅 Award' };
   $('board').append(el('div', { style: 'position:absolute;left:10px;bottom:10px;display:grid;gap:4px;background:#000a;padding:8px;border-radius:8px' },
     el('b', { style: 'font-size:12px' }, 'Test sounds'),
     ...Object.entries(SOUNDS).map(([n, label]) => {
@@ -691,7 +1145,7 @@ cv.onclick = e => {
   let best = null, bd = t.kind === 'h' ? 0.9 : 0.4;
   for (const id of t.ids) { const p = pos(id), d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = id; } }
   if (best === null) return;
-  if (t.kind === 'h') act('bandit', { hex: best });
+  if (t.kind === 'h') act('robber', { hex: best });
   else { act('build', { kind: t.build, id: best }); mode = null; }
 };
 </script>

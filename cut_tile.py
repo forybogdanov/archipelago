@@ -1,6 +1,6 @@
 # Turn a generated overhang tile (magenta background) into img/<name>.png for the board.
 # Usage: python cut_tile.py <image> <name>     e.g. python cut_tile.py forest.webp forest
-#        name ship, pirate, outpost, town or route = a sprite, just trimmed (no hexagon).
+#        name ship, pirate, settlement, city or road = a sprite, just trimmed (no hexagon).
 #
 # Output format (what index.html expects): 256 x 444 PNG with transparency.
 # The pointy-top hexagon base fills the bottom 256 x 296 px; the 148 px above it is overhang room.
@@ -27,7 +27,7 @@ solid = alpha > .5
 rgba = np.dstack([a, alpha * 255]).clip(0, 255).astype(np.uint8)
 img = Image.fromarray(rgba, 'RGBA')
 
-if name in ('ship', 'pirate', 'outpost', 'town', 'route'):
+if name in ('ship', 'pirate', 'settlement', 'city', 'road'):
     # Sprite (art faces right): just trim to the visible pixels, 256 px wide.
     x0, y0, x1, y1 = img.getchannel('A').point(lambda v: 255 if v > 20 else 0).getbbox()
     crop = img.crop((x0, y0, x1, y1))

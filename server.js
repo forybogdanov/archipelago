@@ -4,16 +4,17 @@ const fs = require('fs');
 const path = require('path');
 const { Server } = require('socket.io');
 
-const PORT = process.env.PORT || 3000;
-const RES = ['timber', 'clay', 'wool', 'grain', 'metal'];
-const YIELD = { forest: 'timber', quarry: 'clay', meadow: 'wool', farm: 'grain', mine: 'metal', desert: null };
+const PORT = process.env.PORT || 3001;
+const RES = ['wood', 'brick', 'sheep', 'wheat', 'ore'];
+const YIELD = { forest: 'wood', hills: 'brick', pasture: 'sheep', fields: 'wheat', mountains: 'ore', desert: null };
 const COST = {
-  route: { timber: 1, clay: 1 },
-  outpost: { timber: 1, clay: 1, wool: 1, grain: 1 },
-  town: { grain: 2, metal: 3 },
-  card: { wool: 1, grain: 1, metal: 1 },
+  road: { wood: 1, brick: 1 },
+  settlement: { wood: 1, brick: 1, sheep: 1, wheat: 1 },
+  city: { wheat: 2, ore: 3 },
+  card: { sheep: 1, wheat: 1, ore: 1 },
 };
-const LIMIT = { route: 15, outpost: 5, town: 4 };
+const LIMIT = { road: 15, settlement: 5, city: 4 };
+const PLURAL = { road: 'roads', settlement: 'settlements', city: 'cities' };
 const WIN = 12, MAX_PLAYERS = 4;
 const COLORS = ['#e4572e', '#29b6f6', '#f5f5f5', '#ab47bc'];
 
@@ -32,7 +33,7 @@ function genBoard() {
   // 19 hexes: every axial cell within 2 steps of the centre forms one big hexagon.
   const cells = [];
   for (let q = -2; q <= 2; q++) for (let r = Math.max(-2, -q - 2); r <= Math.min(2, -q + 2); r++) cells.push([q, r]);
-  const terrain = shuffle(['desert', ...['forest', 'meadow', 'farm'].flatMap(t => [t, t, t, t]), ...['quarry', 'mine'].flatMap(t => [t, t, t])]);
+  const terrain = shuffle(['desert', ...['forest', 'pasture', 'fields'].flatMap(t => [t, t, t, t]), ...['hills', 'mountains'].flatMap(t => [t, t, t])]);
   const nums = shuffle([2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12]);
   const hexes = cells.map(([q, r], i) => ({
     q, r, x: Math.sqrt(3) * (q + r / 2), y: 1.5 * r, terrain: terrain[i],
@@ -43,7 +44,7 @@ function genBoard() {
   const vertices = [], edges = [], vmap = new Map(), emap = new Map();
   const vid = (x, y) => {
     const k = Math.round(x * 100) + ',' + Math.round(y * 100);
-    if (!vmap.has(k)) { vmap.set(k, vertices.length); vertices.push({ id: vertices.length, x, y, hexes: [], adj: [], edges: [], owner: null, town: false, port: null }); }
+    if (!vmap.has(k)) { vmap.set(k, vertices.length); vertices.push({ id: vertices.length, x, y, hexes: [], adj: [], edges: [], owner: null, city: false, port: null }); }
     return vmap.get(k);
   };
   hexes.forEach((h, hi) => {
@@ -71,7 +72,7 @@ function genBoard() {
     const e = coast[(off + Math.floor(i * coast.length / types.length)) % coast.length];
     e.port = vertices[e.a].port = vertices[e.b].port = t;
   });
-  return { hexes, vertices, edges, bandit: hexes.findIndex(h => h.terrain === 'desert') };
+  return { hexes, vertices, edges, robber: hexes.findIndex(h => h.terrain === 'desert') };
 }
 
 // ---------- rules ----------
@@ -80,18 +81,18 @@ function legal(R, i) {
   const free = v => v.owner === null && v.adj.every(a => b.vertices[a].owner === null);
   const reach = id => { const v = b.vertices[id]; return v.owner === i || (v.owner === null && v.edges.some(e => b.edges[e].owner === i)); };
   return {
-    outposts: b.vertices.filter(v => free(v) && (setup || v.edges.some(e => b.edges[e].owner === i))).map(v => v.id),
-    routes: b.edges.filter(e => e.owner === null && (setup ? (e.a === R.lastOutpost || e.b === R.lastOutpost) : (reach(e.a) || reach(e.b)))).map(e => e.id),
-    towns: setup ? [] : b.vertices.filter(v => v.owner === i && !v.town).map(v => v.id),
+    settlements: b.vertices.filter(v => free(v) && (setup || v.edges.some(e => b.edges[e].owner === i))).map(v => v.id),
+    roads: b.edges.filter(e => e.owner === null && (setup ? (e.a === R.lastSettlement || e.b === R.lastSettlement) : (reach(e.a) || reach(e.b)))).map(e => e.id),
+    cities: setup ? [] : b.vertices.filter(v => v.owner === i && !v.city).map(v => v.id),
   };
 }
 
 function piecesLeft(R, i) {
   const b = R.board, mine = b.vertices.filter(v => v.owner === i);
   return {
-    route: LIMIT.route - b.edges.filter(e => e.owner === i).length,
-    outpost: LIMIT.outpost - mine.filter(v => !v.town).length,
-    town: LIMIT.town - mine.filter(v => v.town).length,
+    road: LIMIT.road - b.edges.filter(e => e.owner === i).length,
+    settlement: LIMIT.settlement - mine.filter(v => !v.city).length,
+    city: LIMIT.city - mine.filter(v => v.city).length,
   };
 }
 
@@ -103,14 +104,14 @@ function ratio(R, i, r) {
 
 function points(R, i, withSecret = true) {
   let s = 0;
-  for (const v of R.board.vertices) if (v.owner === i) s += v.town ? 2 : 1;
+  for (const v of R.board.vertices) if (v.owner === i) s += v.city ? 2 : 1;
   if (R.longest === i) s += 2;
-  if (R.fleet === i) s += 2;
-  if (withSecret) { const p = R.players[i]; s += [...p.cards, ...p.fresh].filter(c => c === 'renown').length; }
+  if (R.army === i) s += 2;
+  if (withSecret) { const p = R.players[i]; s += [...p.cards, ...p.fresh].filter(c => c === 'victory').length; }
   return s;
 }
 
-// Longest chain of own routes; opponent buildings break it. ponytail: brute-force DFS, fine at 15 routes.
+// Longest chain of own roads; opponent buildings break it. ponytail: brute-force DFS, fine at 15 roads.
 function longest(b, pi) {
   let best = 0;
   const used = new Set();
@@ -140,14 +141,58 @@ function awards(R) {
   }
   R.longest = h;
   R.players.forEach((p, i) => {
-    if (p.captains >= 3 && (R.fleet === null || p.captains > R.players[R.fleet].captains)) R.fleet = i;
+    if (p.knights >= 3 && (R.army === null || p.knights > R.players[R.army].knights)) R.army = i;
   });
+}
+
+// ---------- duel (challenge card) ----------
+// Real-time first-person shootout; the rules live in duel.js (shared with the page). Clients own their movement
+// (relayed via 'move') and aim; the server decides every shot, the health, the rounds and the winner.
+const DUEL = require('./duel');
+
+function startDuel(R, a, b) {
+  R.duel = DUEL.create(a, b, Date.now());
+  R.resume = R.step; R.step = 'duel';
+  log(R, `⚔️ ${R.players[a].name} challenges ${R.players[b].name} to a duel!`);
+}
+
+const duellist = (R, i) => need(R.duel && (i === R.duel.a || i === R.duel.b), 'Not duelling');
+
+function duelMove(R, i, p, now = Date.now()) { duellist(R, i); DUEL.move(R.duel, i, p, now); }
+
+// a = { p: where i stands, dir, w: weapon, alt }. Returns the shot for both screens; the last kill ends the duel.
+function duelShoot(R, i, a, now = Date.now()) {
+  duellist(R, i);
+  const D = R.duel;
+  if (a.p) DUEL.move(D, i, a.p, now);
+  const ev = DUEL.shoot(D, i, a, now);
+  if (D.winner !== null) endDuel(R, D.winner);
+  return ev;
+}
+
+// Round clock. True when the state changed (round timed out, next round began, duel over).
+function duelTick(R, now = Date.now()) {
+  const D = R.duel;
+  if (!D || !DUEL.tick(D, now)) return false;
+  if (D.winner !== null) endDuel(R, D.winner);
+  return true;
+}
+
+// Challenger wins: takes every resource of the challenged. Otherwise nothing changes hands.
+function endDuel(R, winner) {
+  const { a, b, score } = R.duel, A = R.players[a], B = R.players[b], sc = `${score[winner]}:${score[winner === a ? b : a]}`;
+  if (winner === a) {
+    const got = { ...B.res };
+    pay(A.res, got, 1); pay(B.res, got);
+    log(R, `🏆 ${A.name} wins the duel ${sc} and takes all of ${B.name}'s resources (${total(got)})!`);
+  } else log(R, `🛡️ ${B.name} wins the duel ${sc} and keeps their resources`);
+  R.duel = null; R.step = R.resume;
 }
 
 function steal(R, i, j) {
   const pool = RES.flatMap(k => Array(R.players[j].res[k]).fill(k)), k = pool[rnd(pool.length)];
   R.players[j].res[k]--; R.players[i].res[k]++;
-  log(R, `${R.players[i].name} robbed ${R.players[j].name} of a good`);
+  log(R, `${R.players[i].name} robbed ${R.players[j].name} of a resource`);
   R.step = R.resume;
 }
 
@@ -155,28 +200,28 @@ const ACT = {
   build(R, i, { kind, id }) {
     const p = R.players[i], b = R.board, L = legal(R, i);
     if (R.phase === 'setup') {
-      need(kind === R.step && L[kind + 's'].includes(id), 'Illegal placement');
+      need(kind === R.step && L[PLURAL[kind]].includes(id), 'Illegal placement');
       const n = R.players.length;
-      log(R, `${p.name} placed a${kind === 'outpost' ? 'n' : ''} ${kind}`);
-      if (kind === 'outpost') {
-        b.vertices[id].owner = i; R.lastOutpost = id; R.step = 'route';
+      log(R, `${p.name} placed a ${kind}`);
+      if (kind === 'settlement') {
+        b.vertices[id].owner = i; R.lastSettlement = id; R.step = 'road';
         if (R.setupIdx >= n) for (const h of b.vertices[id].hexes) { const r = YIELD[b.hexes[h].terrain]; if (r) p.res[r]++; }
       } else {
         b.edges[id].owner = i;
         R.setupIdx++;
-        if (R.setupIdx === 2 * n) { R.phase = 'main'; R.turn = 0; R.step = 'roll'; log(R, 'Setup done — set sail!'); }
-        else { R.turn = R.setupIdx < n ? R.setupIdx : 2 * n - 1 - R.setupIdx; R.step = 'outpost'; }
+        if (R.setupIdx === 2 * n) { R.phase = 'main'; R.turn = 0; R.step = 'roll'; log(R, 'Setup done — the game begins!'); }
+        else { R.turn = R.setupIdx < n ? R.setupIdx : 2 * n - 1 - R.setupIdx; R.step = 'settlement'; }
       }
       return;
     }
     need(R.step === 'act', 'Roll first');
-    need(Object.hasOwn(LIMIT, kind) && L[kind + 's'].includes(id), 'Illegal placement');
-    need(has(p.res, COST[kind]), 'Not enough goods');
-    need(piecesLeft(R, i)[kind] > 0, `No ${kind}s left`);
+    need(Object.hasOwn(LIMIT, kind) && L[PLURAL[kind]].includes(id), 'Illegal placement');
+    need(has(p.res, COST[kind]), 'Not enough resources');
+    need(piecesLeft(R, i)[kind] > 0, `No ${PLURAL[kind]} left`);
     pay(p.res, COST[kind]);
-    if (kind === 'route') b.edges[id].owner = i;
-    else if (kind === 'outpost') b.vertices[id].owner = i;
-    else b.vertices[id].town = true;
+    if (kind === 'road') b.edges[id].owner = i;
+    else if (kind === 'settlement') b.vertices[id].owner = i;
+    else b.vertices[id].city = true;
     log(R, `${p.name} built a ${kind}`);
   },
 
@@ -188,13 +233,13 @@ const ACT = {
       R.discard = {};
       R.players.forEach((p, j) => { const t = total(p.res); if (t > 7) R.discard[j] = Math.floor(t / 2); });
       R.resume = 'act';
-      R.step = Object.keys(R.discard).length ? 'discard' : 'bandit';
-      log(R, '🗡️ Bandits raid the island!');
+      R.step = Object.keys(R.discard).length ? 'discard' : 'robber';
+      log(R, '🗡️ The robber raids the island!');
       return;
     }
     b.hexes.forEach((h, hi) => {
-      if (h.num !== s || hi === b.bandit) return;
-      for (const v of h.corners) { const V = b.vertices[v]; if (V.owner !== null) R.players[V.owner].res[YIELD[h.terrain]] += V.town ? 2 : 1; }
+      if (h.num !== s || hi === b.robber) return;
+      for (const v of h.corners) { const V = b.vertices[v]; if (V.owner !== null) R.players[V.owner].res[YIELD[h.terrain]] += V.city ? 2 : 1; }
     });
     R.step = 'act';
   },
@@ -203,17 +248,17 @@ const ACT = {
     const n = R.discard[i], p = R.players[i], b = bag(res);
     need(R.step === 'discard' && n, 'Nothing to discard');
     need(total(b) === n, `Discard exactly ${n}`);
-    need(has(p.res, b), "You don't have those goods");
+    need(has(p.res, b), "You don't have those resources");
     pay(p.res, b);
     delete R.discard[i];
-    if (!Object.keys(R.discard).length) R.step = 'bandit';
+    if (!Object.keys(R.discard).length) R.step = 'robber';
   },
 
-  bandit(R, i, { hex }) {
+  robber(R, i, { hex }) {
     const b = R.board;
-    need(R.step === 'bandit', 'Not now');
-    need(Number.isInteger(hex) && hex >= 0 && hex < b.hexes.length && hex !== b.bandit, 'Pick another hex');
-    b.bandit = hex;
+    need(R.step === 'robber', 'Not now');
+    need(Number.isInteger(hex) && hex >= 0 && hex < b.hexes.length && hex !== b.robber, 'Pick another hex');
+    b.robber = hex;
     R.victims = [...new Set(b.hexes[hex].corners.map(v => b.vertices[v].owner))].filter(o => o !== null && o !== i && total(R.players[o].res) > 0);
     if (R.victims.length === 1) steal(R, i, R.victims[0]);
     else if (R.victims.length) R.step = 'steal';
@@ -228,26 +273,28 @@ const ACT = {
   buy(R, i) {
     const p = R.players[i];
     need(R.step === 'act', 'Not now');
-    need(R.deck.length, 'Expedition deck is empty');
-    need(has(p.res, COST.card), 'Not enough goods');
+    need(R.deck.length, 'Development card deck is empty');
+    need(has(p.res, COST.card), 'Not enough resources');
     pay(p.res, COST.card);
     p.fresh.push(R.deck.pop());
-    log(R, `${p.name} bought an expedition card`);
+    log(R, `${p.name} bought a development card`);
   },
 
-  play(R, i, { card, res }) {
+  play(R, i, { card, res, target }) {
     const p = R.players[i], k = p.cards.indexOf(card);
-    need(R.step === 'roll' || R.step === 'act', 'Not now');
+    need(R.step === 'act', 'Roll the dice first');
     need(!R.cardPlayed, 'One card per turn');
-    need(k >= 0 && card !== 'renown', "You can't play that");
-    if (card === 'boon') {
-      need(Array.isArray(res) && res.length === 2 && res.every(r => RES.includes(r)), 'Pick two goods');
+    need(k >= 0 && card !== 'victory', "You can't play that");
+    if (card === 'plenty') {
+      need(Array.isArray(res) && res.length === 2 && res.every(r => RES.includes(r)), 'Pick two resources');
       res.forEach(r => p.res[r]++);
     }
+    if (card === 'challenge') need(Number.isInteger(target) && target !== i && R.players[target], 'Pick a player to challenge');
     p.cards.splice(k, 1);
     R.cardPlayed = true;
-    if (card === 'captain') { p.captains++; R.resume = R.step; R.step = 'bandit'; }
-    log(R, `${p.name} played ${card === 'captain' ? 'a Captain' : 'a Resource Boon'}`);
+    if (card === 'knight') { p.knights++; R.resume = R.step; R.step = 'robber'; }
+    log(R, `${p.name} played ${{ knight: 'a Knight', plenty: 'a Year of Plenty', challenge: 'a Challenge' }[card]}`);
+    if (card === 'challenge') startDuel(R, i, target);
   },
 
   bank(R, i, { give, get }) {
@@ -264,21 +311,21 @@ const ACT = {
     const g = bag(give), w = bag(want);
     need(R.step === 'act', 'Not now');
     need(total(g) && total(w), 'Offer something for something');
-    need(has(R.players[i].res, g), "You don't have those goods");
+    need(has(R.players[i].res, g), "You don't have those resources");
     R.trade = { from: i, give: g, want: w, accepts: [] };
   },
 
   accept(R, i) {
     const t = R.trade;
     need(t && t.from !== i, 'No offer to accept');
-    need(has(R.players[i].res, t.want), "You don't have the goods");
+    need(has(R.players[i].res, t.want), "You don't have the resources");
     if (!t.accepts.includes(i)) t.accepts.push(i);
   },
 
   confirm(R, i, { with: j }) {
     const t = R.trade, p = R.players[i], q = R.players[j];
     need(R.step === 'act' && t && t.from === i && t.accepts.includes(j), 'Not now');
-    need(has(p.res, t.give) && has(q.res, t.want), 'Someone no longer has the goods');
+    need(has(p.res, t.give) && has(q.res, t.want), 'Someone no longer has the resources');
     pay(p.res, t.give); pay(q.res, t.give, 1);
     pay(q.res, t.want); pay(p.res, t.want, 1);
     R.trade = null;
@@ -308,23 +355,23 @@ const ACT = {
 
 // Test cheats, typed in chat. Only with `node server.js --cheats` (npm run cheat); always announced in the log.
 //   /give [n]            n of every good (default 5)
-//   /give <good> [n]     n of one good, e.g. /give metal 3
-//   /card <type>         playable card now: captain | boon | renown
+//   /give <resource> [n] n of one resource, e.g. /give ore 3
+//   /card <type>         playable card now: knight | plenty | victory | challenge
 const CHEATS = process.argv.includes('--cheats');
 function cheat(R, i, cmd) {
   need(CHEATS, 'Cheats are off (start the server with npm run cheat)');
   need(R.phase === 'main' || R.phase === 'setup', 'Start a game first');
   const p = R.players[i], [name, a, b] = cmd.slice(1).toLowerCase().split(/\s+/);
   if (name === 'give') {
-    const good = RES.includes(a) ? a : null, n = Math.max(1, Math.min(99, parseInt(good ? b : a) || 5));
-    need(good || !a || /^\d+$/.test(a), `Unknown good: ${a} (${RES.join(', ')})`);
-    for (const k of good ? [good] : RES) p.res[k] += n;
-    log(R, `🧪 ${p.name} cheated in ${n} ${good || 'of every good'}`);
+    const res = RES.includes(a) ? a : null, n = Math.max(1, Math.min(99, parseInt(res ? b : a) || 5));
+    need(res || !a || /^\d+$/.test(a), `Unknown resource: ${a} (${RES.join(', ')})`);
+    for (const k of res ? [res] : RES) p.res[k] += n;
+    log(R, `🧪 ${p.name} cheated in ${n} ${res || 'of every resource'}`);
   } else if (name === 'card') {
-    need(['captain', 'boon', 'renown'].includes(a), 'Usage: /card captain|boon|renown');
+    need(['knight', 'plenty', 'victory', 'challenge'].includes(a), 'Usage: /card knight|plenty|victory|challenge');
     p.cards.push(a);
     log(R, `🧪 ${p.name} cheated in a ${a} card`);
-  } else need(false, 'Cheats: /give [n], /give <good> [n], /card captain|boon|renown');
+  } else need(false, 'Cheats: /give [n], /give <resource> [n], /card knight|plenty|victory|challenge');
 }
 
 // Single entry point for every game action (sockets and tests both go through here).
@@ -340,23 +387,23 @@ function act(R, i, type, a = {}) {
     awards(R);
     if (points(R, R.turn) >= WIN) {
       R.phase = 'over'; R.winner = R.turn;
-      log(R, `🏆 ${R.players[R.turn].name} wins with ${points(R, R.turn)} Renown!`);
+      log(R, `🏆 ${R.players[R.turn].name} wins with ${points(R, R.turn)} Victory Points!`);
     }
   }
 }
 
 function makeRoom(code) { return { code, host: null, players: [], phase: 'lobby', log: [] }; }
 
-function startGame(R) {
+function startGame(R, open = false) {
   shuffle(R.players);
   Object.assign(R, {
-    phase: 'setup', board: genBoard(),
-    deck: shuffle([...Array(14).fill('captain'), ...Array(4).fill('boon'), ...Array(5).fill('renown')]),
-    turn: 0, step: 'outpost', setupIdx: 0, lastOutpost: null, dice: null, discard: {}, victims: [], resume: 'act',
-    trade: null, cardPlayed: false, longest: null, fleet: null, winner: null, lens: R.players.map(() => 0),
+    phase: 'setup', board: genBoard(), open, // open: everyone sees everyone's resources
+    deck: shuffle([...Array(14).fill('knight'), ...Array(4).fill('plenty'), ...Array(5).fill('victory'), ...Array(3).fill('challenge')]),
+    turn: 0, step: 'settlement', setupIdx: 0, lastSettlement: null, dice: null, discard: {}, victims: [], resume: 'act',
+    trade: null, duel: null, cardPlayed: false, longest: null, army: null, winner: null, lens: R.players.map(() => 0),
   });
-  for (const p of R.players) Object.assign(p, { res: bag({}), cards: [], fresh: [], captains: 0 });
-  log(R, 'The voyage begins! Each captain places an outpost and a route (snake order).');
+  for (const p of R.players) Object.assign(p, { res: bag({}), cards: [], fresh: [], knights: 0 });
+  log(R, 'The settlers arrive! Each player places a settlement and a road (snake order).');
 }
 
 // Per-player view: hides other hands and cards.
@@ -366,14 +413,16 @@ function view(R, me) {
     code: R.code, phase: R.phase, me, isHost: R.players[me].pid === R.host, win: WIN, cost: COST, log: R.log.slice(-60), logSeq: R.logSeq || 0,
     players: R.players.map((p, i) => ({
       name: p.name, color: p.color, connected: p.connected,
-      ...(inGame && { hand: total(p.res), cards: p.cards.length + p.fresh.length, captains: p.captains, route: R.lens[i], points: points(R, i, i === me || over) }),
+      ...(inGame && { hand: total(p.res), cards: p.cards.length + p.fresh.length, knights: p.knights, road: R.lens[i], points: points(R, i, i === me || over) }),
+      ...(inGame && R.open && { res: p.res }),
     })),
   };
   if (!inGame) return base;
   const p = R.players[me], mine = R.turn === me;
   return {
-    ...base, board: R.board, turn: R.turn, step: R.step, dice: R.dice, longest: R.longest, fleet: R.fleet,
+    ...base, board: R.board, turn: R.turn, step: R.step, dice: R.dice, longest: R.longest, army: R.army,
     trade: R.trade, winner: R.winner, deckLeft: R.deck.length,
+    duel: R.duel && DUEL.view(R.duel, Date.now()),
     discard: R.step === 'discard' ? R.discard[me] || 0 : 0,
     victims: R.step === 'steal' && mine ? R.victims : null,
     legal: mine && (R.phase === 'setup' || R.step === 'act') ? legal(R, me) : null,
@@ -386,7 +435,7 @@ function view(R, me) {
 
 // ---------- network ----------
 const server = http.createServer((req, res) => {
-  if (req.method === 'GET' && (req.url === '/' || req.url.startsWith('/?'))) {
+  if (req.method === 'GET' && (req.url === '/' || req.url.startsWith('/?') || req.url === '/test-duel')) {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     fs.createReadStream(path.join(__dirname, 'index.html')).pipe(res);
   } else if (/^\/img\/[a-z]+\.(jpg|png)$/.test(req.url) && fs.existsSync(path.join(__dirname, req.url))) {
@@ -395,6 +444,9 @@ const server = http.createServer((req, res) => {
   } else if (/^\/sfx\/[a-z_]+\.(mp3|ogg)$/.test(req.url) && fs.existsSync(path.join(__dirname, req.url))) {
     res.writeHead(200, { 'Content-Type': req.url.endsWith('.ogg') ? 'audio/ogg' : 'audio/mpeg', 'Cache-Control': 'no-cache' });
     fs.createReadStream(path.join(__dirname, req.url)).pipe(res);
+  } else if (req.url === '/duel.js') { // duel rules shared with the page
+    res.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-cache' });
+    fs.createReadStream(path.join(__dirname, 'duel.js')).pipe(res);
   } else if (req.url === '/board') { // random board for the ?preview page
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(genBoard()));
@@ -427,13 +479,25 @@ io.on('connection', socket => {
     socket.data.pid = pid;
   }));
 
-  socket.on('start', guard(() => {
+  socket.on('start', guard(({ open }) => {
     need(R.host === socket.data.pid && (R.phase === 'lobby' || R.phase === 'over'), 'Only the host can start');
     need(R.players.length >= 2, 'Need at least 2 players');
-    startGame(R);
+    startGame(R, open === true);
   }));
 
   socket.on('act', guard(({ type, ...a }) => act(R, me(), type, a)));
+
+  // Duel traffic skips the full-state broadcast: positions go straight to the opponent, shots to both.
+  // Full state follows only when health or the score changed.
+  const foe = () => { const D = R.duel; return D && R.players[me() === D.a ? D.b : D.a]; };
+  socket.on('move', a => { try { duelMove(R, me(), a || {}); const f = foe(); f && io.to(f.sid).volatile.emit('foe', R.duel.pos[me()]); } catch {} });
+  socket.on('shoot', a => {
+    try {
+      const f = foe(), ev = duelShoot(R, me(), a || {});
+      socket.emit('fired', ev); f && io.to(f.sid).emit('fired', ev);
+      if (ev.dmg) send();
+    } catch {} // too fast / round not live: the shot simply doesn't count
+  });
 
   socket.on('disconnect', () => {
     const p = R.players[me()];
@@ -447,6 +511,7 @@ io.on('connection', socket => {
 });
 
 if (require.main === module) {
+  setInterval(() => { if (duelTick(R)) send(); }, 100); // duel round clock
   server.listen(PORT, () => console.log(`Archipelago on http://localhost:${PORT} — share it with: ngrok http ${PORT}`));
 }
-module.exports = { RES, makeRoom, startGame, act, legal, ratio, points };
+module.exports = { RES, makeRoom, startGame, act, legal, ratio, points, duelMove, duelShoot, duelTick };
